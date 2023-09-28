@@ -300,7 +300,7 @@ class Game:
             return False
         #The defenders’s AI, Firewall and Program can only move down or right.
         if (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.col > coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.row > coords.dst.row):
-            print("The attacker’s AI, Firewall and Program can only move up or left")
+            print("The defenders’s AI, Firewall and Program can only move down or right")
             return False
         
         return (unit is None)
