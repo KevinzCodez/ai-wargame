@@ -287,7 +287,25 @@ class Game:
         if unit is None or unit.player != self.next_player:
             return False
         unit = self.get(coords.dst)
+         # return (unit is None) <- i Commented this
+        
+    #ADDED CODE---------------------------------------------------------------------------------------------
+        
+        #The Tech and Virus can move up, down, right, left
+        if(self.board[coords.src.row][coords.src.col].type == UnitType.Tech) or (self.board[coords.src.row][coords.src.col].type == UnitType.Virus):
+            return True
+        #The attacker’s AI, Firewall and Program can only move up or left.
+        if (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.col < coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.row < coords.dst.row):
+            print("The attacker’s AI, Firewall and Program can only move up or left")
+            return False
+        #The defenders’s AI, Firewall and Program can only move down or right.
+        if (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.col > coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.row > coords.dst.row):
+            print("The attacker’s AI, Firewall and Program can only move up or left")
+            return False
+        
         return (unit is None)
+
+    #END OF ADDED CODE -------------------------------------------------------------------------------------
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
