@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import copy
+import time
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import Tuple, Iterable, ClassVar
@@ -14,6 +15,7 @@ class UnitType(Enum):
     Firewall = 3
     Program = 4
 
+
 class Player(Enum):
     """The 2 players."""
     Attacker = 0
@@ -26,11 +28,13 @@ class Player(Enum):
         else:
             return Player.Attacker
 
+
 class GameType(Enum):
     AttackerVsDefender = 0
     AttackerVsComp = 1
     CompVsDefender = 2
     CompVsComp = 3
+
 
 ##############################################################################################################
 
@@ -38,29 +42,29 @@ class GameType(Enum):
 class Unit:
     player: Player = Player.Attacker
     type: UnitType = UnitType.Program
-    health : int = 9
+    health: int = 9
     # class variable: damage table for units (based on the unit type constants in order)
-    damage_table : ClassVar[list[list[int]]] = [
-        [3,3,3,1,3], # AI
-        [9,1,6,1,6], # Virus
-        [1,6,1,1,1], # Tech
-        [1,1,1,1,1], # Firewall
-        [3,3,3,1,3], # Program
+    damage_table: ClassVar[list[list[int]]] = [
+        [3, 3, 3, 1, 3],  # AI
+        [9, 1, 6, 1, 6],  # Virus
+        [1, 6, 1, 1, 1],  # Tech
+        [1, 1, 1, 1, 1],  # Firewall
+        [3, 3, 3, 1, 3],  # Program
     ]
     # class variable: repair table for units (based on the unit type constants in order)
-    repair_table : ClassVar[list[list[int]]] = [
-        [0,1,1,0,0], # AI
-        [0,0,0,0,0], # Virus
-        [3,0,0,3,3], # Tech
-        [0,0,0,0,0], # Firewall
-        [0,0,0,0,0], # Program
+    repair_table: ClassVar[list[list[int]]] = [
+        [0, 1, 1, 0, 0],  # AI
+        [0, 0, 0, 0, 0],  # Virus
+        [3, 0, 0, 3, 3],  # Tech
+        [0, 0, 0, 0, 0],  # Firewall
+        [0, 0, 0, 0, 0],  # Program
     ]
 
     def is_alive(self) -> bool:
         """Are we alive ?"""
         return self.health > 0
 
-    def mod_health(self, health_delta : int):
+    def mod_health(self, health_delta: int):
         """Modify this unit's health by delta amount."""
         self.health += health_delta
         if self.health < 0:
@@ -73,11 +77,11 @@ class Unit:
         p = self.player.name.lower()[0]
         t = self.type.name.upper()[0]
         return f"{p}{t}{self.health}"
-    
+
     def __str__(self) -> str:
         """Text representation of this unit."""
         return self.to_string()
-    
+
     def damage_amount(self, target: Unit) -> int:
         """How much can this unit damage another unit."""
         amount = self.damage_table[self.type.value][target.type.value]
@@ -92,59 +96,60 @@ class Unit:
             return 9 - target.health
         return amount
 
+
 ##############################################################################################################
 
 @dataclass(slots=True)
 class Coord:
     """Representation of a game cell coordinate (row, col)."""
-    row : int = 0
-    col : int = 0
+    row: int = 0
+    col: int = 0
 
     def col_string(self) -> str:
         """Text representation of this Coord's column."""
         coord_char = '?'
         if self.col < 5:
-                coord_char = "01234"[self.col]
+            coord_char = "01234"[self.col]
         return str(coord_char)
 
     def row_string(self) -> str:
         """Text representation of this Coord's row."""
         coord_char = '?'
         if self.row < 5:
-                coord_char = "ABCDE"[self.row]
+            coord_char = "ABCDE"[self.row]
         return str(coord_char)
 
     def to_string(self) -> str:
         """Text representation of this Coord."""
-        return self.row_string()+self.col_string()
-    
+        return self.row_string() + self.col_string()
+
     def __str__(self) -> str:
         """Text representation of this Coord."""
         return self.to_string()
-    
+
     def clone(self) -> Coord:
         """Clone a Coord."""
         return copy.copy(self)
 
     def iter_range(self, dist: int) -> Iterable[Coord]:
         """Iterates over Coords inside a rectangle centered on our Coord."""
-        for row in range(self.row-dist,self.row+1+dist):
-            for col in range(self.col-dist,self.col+1+dist):
-                yield Coord(row,col)
+        for row in range(self.row - dist, self.row + 1 + dist):
+            for col in range(self.col - dist, self.col + 1 + dist):
+                yield Coord(row, col)
 
     def iter_adjacent(self) -> Iterable[Coord]:
         """Iterates over adjacent Coords."""
-        yield Coord(self.row-1,self.col)
-        yield Coord(self.row,self.col-1)
-        yield Coord(self.row+1,self.col)
-        yield Coord(self.row,self.col+1)
+        yield Coord(self.row - 1, self.col)
+        yield Coord(self.row, self.col - 1)
+        yield Coord(self.row + 1, self.col)
+        yield Coord(self.row, self.col + 1)
 
     @classmethod
-    def from_string(cls, s : str) -> Coord | None:
+    def from_string(cls, s: str) -> Coord | None:
         """Create a Coord from a string. ex: D2."""
         s = s.strip()
         for sep in " ,.:;-_":
-                s = s.replace(sep, "")
+            s = s.replace(sep, "")
         if (len(s) == 2):
             coord = Coord()
             coord.row = "ABCDE".find(s[0:1].upper())
@@ -153,38 +158,39 @@ class Coord:
         else:
             return None
 
+
 ##############################################################################################################
 
 @dataclass(slots=True)
 class CoordPair:
     """Representation of a game move or a rectangular area via 2 Coords."""
-    src : Coord = field(default_factory=Coord)
-    dst : Coord = field(default_factory=Coord)
+    src: Coord = field(default_factory=Coord)
+    dst: Coord = field(default_factory=Coord)
 
     def to_string(self) -> str:
         """Text representation of a CoordPair."""
-        return self.src.to_string()+" "+self.dst.to_string()
-    
+        return self.src.to_string() + " " + self.dst.to_string()
+
     def __str__(self) -> str:
         """Text representation of a CoordPair."""
         return self.to_string()
-    
+
     def clone(self) -> CoordPair:
         """Clones a CoordPair."""
         return copy.copy(self)
 
     def iter_rectangle(self) -> Iterable[Coord]:
         """Iterates over cells of a rectangular area."""
-        for row in range(self.src.row,self.dst.row+1):
-            for col in range(self.src.col,self.dst.col+1):
-                yield Coord(row,col)
-    
+        for row in range(self.src.row, self.dst.row + 1):
+            for col in range(self.src.col, self.dst.col + 1):
+                yield Coord(row, col)
+
     @classmethod
-    def from_string(cls, s : str) -> CoordPair | None:
+    def from_string(cls, s: str) -> CoordPair | None:
         """Create a CoordPair from a string. ex: A3 B2"""
         s = s.strip()
         for sep in " ,.:;-_":
-                s = s.replace(sep, "")
+            s = s.replace(sep, "")
         if (len(s) == 4):
             coords = CoordPair()
             coords.src.row = "ABCDE".find(s[0:1].upper())
@@ -195,16 +201,18 @@ class CoordPair:
         else:
             return None
 
+
 ##############################################################################################################
 
 @dataclass(slots=True)
 class Options:
     """Representation of the game options."""
     dim: int = 5
-    max_time : float | None = 5.0
-    game_type : GameType = GameType.AttackerVsDefender
-    alpha_beta : bool = True
-    max_turns : int | None = 100
+    max_time: float | None = 5.0
+    game_type: GameType = GameType.AttackerVsDefender
+    alpha_beta: bool = True
+    max_turns: int | None = 100
+
 
 ##############################################################################################################
 
@@ -213,50 +221,49 @@ class Game:
     """Representation of the game state."""
     board: list[list[Unit | None]] = field(default_factory=list)
     next_player: Player = Player.Attacker
-    turns_played : int = 0
+    turns_played: int = 0
     options: Options = field(default_factory=Options)
-    _attacker_has_ai : bool = True
-    _defender_has_ai : bool = True
+    _attacker_has_ai: bool = True
+    _defender_has_ai: bool = True
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
         dim = self.options.dim
         self.board = [[None for _ in range(dim)] for _ in range(dim)]
-        md = dim-1
-        self.set(Coord(0,0),Unit(player=Player.Defender,type=UnitType.AI))
-        self.set(Coord(1,0),Unit(player=Player.Defender,type=UnitType.Tech))
-        self.set(Coord(0,1),Unit(player=Player.Defender,type=UnitType.Tech))
-        self.set(Coord(2,0),Unit(player=Player.Defender,type=UnitType.Firewall))
-        self.set(Coord(0,2),Unit(player=Player.Defender,type=UnitType.Firewall))
-        self.set(Coord(1,1),Unit(player=Player.Defender,type=UnitType.Program))
-        self.set(Coord(md,md),Unit(player=Player.Attacker,type=UnitType.AI))
-        self.set(Coord(md-1,md),Unit(player=Player.Attacker,type=UnitType.Virus))
-        self.set(Coord(md,md-1),Unit(player=Player.Attacker,type=UnitType.Virus))
-        self.set(Coord(md-2,md),Unit(player=Player.Attacker,type=UnitType.Program))
-        self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Program))
-        self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Firewall))
+        md = dim - 1
+        self.set(Coord(0, 0), Unit(player=Player.Defender, type=UnitType.AI))
+        self.set(Coord(1, 0), Unit(player=Player.Defender, type=UnitType.Tech))
+        self.set(Coord(0, 1), Unit(player=Player.Defender, type=UnitType.Tech))
+        self.set(Coord(2, 0), Unit(player=Player.Defender, type=UnitType.Firewall))
+        self.set(Coord(0, 2), Unit(player=Player.Defender, type=UnitType.Firewall))
+        self.set(Coord(1, 1), Unit(player=Player.Defender, type=UnitType.Program))
+        self.set(Coord(md, md), Unit(player=Player.Attacker, type=UnitType.AI))
+        self.set(Coord(md - 1, md), Unit(player=Player.Attacker, type=UnitType.Virus))
+        self.set(Coord(md, md - 1), Unit(player=Player.Attacker, type=UnitType.Virus))
+        self.set(Coord(md - 2, md), Unit(player=Player.Attacker, type=UnitType.Program))
+        self.set(Coord(md, md - 2), Unit(player=Player.Attacker, type=UnitType.Program))
+        self.set(Coord(md - 1, md - 1), Unit(player=Player.Attacker, type=UnitType.Firewall))
 
     def clone(self) -> Game:
         """Make a new copy of a game for minimax recursion.
-
         Shallow copy of everything except the board (options and stats are shared).
         """
         new = copy.copy(self)
         new.board = copy.deepcopy(self.board)
         return new
 
-    def is_empty(self, coord : Coord) -> bool:
+    def is_empty(self, coord: Coord) -> bool:
         """Check if contents of a board cell of the game at Coord is empty (must be valid coord)."""
         return self.board[coord.row][coord.col] is None
 
-    def get(self, coord : Coord) -> Unit | None:
+    def get(self, coord: Coord) -> Unit | None:
         """Get contents of a board cell of the game at Coord."""
         if self.is_valid_coord(coord):
             return self.board[coord.row][coord.col]
         else:
             return None
 
-    def set(self, coord : Coord, unit : Unit | None):
+    def set(self, coord: Coord, unit: Unit | None):
         """Set contents of a board cell of the game at Coord."""
         if self.is_valid_coord(coord):
             self.board[coord.row][coord.col] = unit
@@ -265,21 +272,21 @@ class Game:
         """Remove unit at Coord if dead."""
         unit = self.get(coord)
         if unit is not None and not unit.is_alive():
-            self.set(coord,None)
+            self.set(coord, None)
             if unit.type == UnitType.AI:
                 if unit.player == Player.Attacker:
                     self._attacker_has_ai = False
                 else:
                     self._defender_has_ai = False
 
-    def mod_health(self, coord : Coord, health_delta : int):
+    def mod_health(self, coord: Coord, health_delta: int):
         """Modify health of unit at Coord (positive or negative delta)."""
         target = self.get(coord)
         if target is not None:
             target.mod_health(health_delta)
             self.remove_dead(coord)
 
-    def is_valid_move(self, coords : CoordPair) -> bool:
+    def is_valid_move(self, coords: CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
@@ -289,13 +296,13 @@ class Game:
         unit = self.get(coords.dst)
         return (unit is None)
 
-    def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
+    def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords):
-            self.set(coords.dst,self.get(coords.src))
-            self.set(coords.src,None)
-            return (True,"")
-        return (False,"invalid move")
+            self.set(coords.dst, self.get(coords.src))
+            self.set(coords.src, None)
+            return (True, "")
+        return (False, "invalid move")
 
     def next_turn(self):
         """Transitions game to the next turn."""
@@ -332,7 +339,7 @@ class Game:
     def __str__(self) -> str:
         """Default string representation of a game."""
         return self.to_string()
-    
+
     def is_valid_coord(self, coord: Coord) -> bool:
         """Check if a Coord is valid within our board dimensions."""
         dim = self.options.dim
@@ -349,26 +356,27 @@ class Game:
                 return coords
             else:
                 print('Invalid coordinates! Try again.')
-    
+
     def human_turn(self):
         """Human player plays a move."""
         while True:
             mv = self.read_move()
-            (success,result) = self.perform_move(mv)
+            (success, result) = self.perform_move(mv)
             if success:
-                print(f"Player {self.next_player.name}: ",end='')
+                print(f"Player {self.next_player.name}: ", end='')
                 print(result)
                 self.next_turn()
-                break
+                print("\n" + str(self))  # Print the board to the terminal
+                return mv
             else:
                 print("The move is not valid! Try again.")
 
-    def player_units(self, player: Player) -> Iterable[Tuple[Coord,Unit]]:
+    def player_units(self, player: Player) -> Iterable[Tuple[Coord, Unit]]:
         """Iterates over all units belonging to a player."""
         for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
             unit = self.get(coord)
             if unit is not None and unit.player == player:
-                yield (coord,unit)
+                yield (coord, unit)
 
     def is_finished(self) -> bool:
         """Check if the game is over."""
@@ -382,12 +390,39 @@ class Game:
             if self._defender_has_ai:
                 return None
             else:
-                return Player.Attacker    
+                return Player.Attacker
         elif self._defender_has_ai:
             return Player.Defender
 
-##############################################################################################################
 
+########################################################################################################### ADDED CODE
+class GameTrace:
+    def __init__(self, filename):
+        self.file = open(filename, 'w')
+
+    def write_parameters(self, options):
+        self.file.write(f"Timeout: {options.max_time} seconds\n")
+        self.file.write(f"Max Turns: {options.max_turns}\n")
+        self.file.write(f"Alpha-Beta: {'On' if options.alpha_beta else 'Off'}\n")
+        self.file.write(f"Play Mode: {options.game_type}\n")
+        self.file.flush()  # Flush the buffer
+
+    def write_board(self, game):
+        self.file.write(str(game) + "\n")
+        self.file.flush()  # Flush the buffer
+
+    def write_action(self, turn, player, action):
+        self.file.write(f"Turn #{turn} - {player.next().name}\n")
+        self.file.write(f"Action: {action}\n")
+        self.file.flush()  # Flush the buffer
+
+    def write_game_result(self, winner, turns_played):
+        self.file.write(f"4. The winner of the game ({winner.name}) wins in {turns_played} turns\n")
+        self.file.flush()  # Flush the buffer
+    def close(self):
+        self.file.close()
+
+##############################################################################################################
 def main():
     # parse command line arguments
     parser = argparse.ArgumentParser(
@@ -396,8 +431,14 @@ def main():
     parser.add_argument('--max_time', type=float, help='maximum search time')
     parser.add_argument('--max_turns', type=int, help='maximum turns before end of game')
     parser.add_argument('--alpha_beta', type=bool, help='alpha-beta on/off')
-    parser.add_argument('--game_type', type=str, default="manual", help='game type: auto|attacker|defender|manual')
+    parser.add_argument('--game_type', type=str, choices=["auto", "attacker", "defender", "manual"], default="manual",
+                        help='game type: auto|attacker|defender|manual')
     args = parser.parse_args()
+
+    # Initialize the GameTrace
+    filename = f"gameTrace-{'true' if args.alpha_beta else 'false'}-{args.max_time}-{args.max_turns}.txt"
+    trace = GameTrace(filename)
+    trace.write_parameters(args)
 
     # parse the game type
     if args.game_type != "manual":
@@ -416,6 +457,9 @@ def main():
 
     # set up game options
     options = Options(game_type=game_type)
+    options.max_time = args.max_time
+    options.max_turns = args.max_turns
+    options.alpha_beta = args.alpha_beta
 
     # override class defaults via command line options
     if args.max_time is not None:
@@ -428,16 +472,22 @@ def main():
     # create a new game
     game = Game(options=options)
 
+    print()
+    print(game)
+    trace.write_board(game)  # Write the current board state to the trace
     # the main game loop
     while True:
-        print()
-        print(game)
         winner = game.has_winner()
         if winner is not None:
+            trace.write_board(game)  # Write the current board state
+            trace.write_game_result(winner, game.turns_played)  # Write the game result
+            trace.close()  # Close the trace file
             print(f"{winner.name} wins!")
             break
         if game.options.game_type == GameType.AttackerVsDefender:
-            game.human_turn()
+            move = game.human_turn()
+            trace.write_action(game.turns_played, game.next_player, move)  # Log the action to the trace file
+            trace.write_board(game)  # Write the current board state to the trace
         elif game.options.game_type == GameType.AttackerVsComp and game.next_player == Player.Attacker:
             game.human_turn()
         elif game.options.game_type == GameType.CompVsDefender and game.next_player == Player.Defender:
@@ -450,8 +500,10 @@ def main():
             else:
                 print("Computer doesn't know what to do!!!")
                 exit(1)
+    trace.close()
+    #############################################################################################################
 
-##############################################################################################################
 
 if __name__ == '__main__':
     main()
+
