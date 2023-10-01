@@ -300,13 +300,12 @@ class Game:
          # return (unit is None) <- i Commented this
         
     # return (unit is None) <- i Commented this
-
-        #Checks if the destination is free (no other unit is on it)
-        if not (self.is_empty(coords.dst)) :
-            print("The destination must be free (no other unit is on it)")
+        #Checking that the destination coordinate is an adjacent square
+        if coords.dst not in Coord.iter_adjacent(coords.src) and coords.dst != coords.src:
+            print("Your destination coordinate is not adjacent to the source coordinate.")
             return False
         
-         #Uses the function is_in_combat() to check whether the unit is in combat or not. If unit is in combat, it cannot move
+        #Uses the function is_in_combat() to check whether the unit is in combat or not. If unit is in combat, it cannot move
         if self.is_in_combat(coords) and ((self.board[coords.src.row][coords.src.col].type == UnitType.AI) or (self.board[coords.src.row][coords.src.col].type == UnitType.Firewall) or (self.board[coords.src.row][coords.src.col].type == UnitType.Program)):
             print("This unit cannot be moved while engaged in combat")
             return False
@@ -340,27 +339,28 @@ class Game:
         target = self.get(coords.dst)
         source = self.get(coords.src)
 
-        if self.is_valid_move(coords):
-            if self.is_empty(coords.dst):
+        if self.is_empty(coords.dst) and self.is_valid_move(coords):
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
                 return (True,"")
+                    
+        elif not self.is_empty(coords.dst):
+            (success, actionType) = self.action(coords)
+            if success:
+                match actionType:
+                    case 0: 
+                        return (True, f"{target.to_string()} self-destructed")
+                    case 1:
+                        return (True, f"{target.to_string()} was repaired by {source.to_string()}")
+                    case 2:
+                        return (True, f"{target.to_string()} was attacked by {source.to_string()}")
             else:
-                (success, actionType) = self.action(coords)
-                if success:
-                    match actionType:
-                        case 0: 
-                            return (True, f"{target.to_string()} self-destructed")
-                        case 1:
-                            return (True, f"{target.to_string()} was repaired by {source.to_string()}")
-                        case 2:
-                            return (True, f"{target.to_string()} was attacked by {source.to_string()}")
+                if actionType == 1:
+                    return (False, f"{target.to_string()} already has max health")
                 else:
-                    if actionType == 1:
-                        return (False, f"{target.to_string()} already has max health")
-                    else:
-                        return (False, f"{target.to_string()} is not adjacent from {source.to_string()}")
-        return (False,"invalid move")
+                    return (False, f"{target.to_string()} is not adjacent from {source.to_string()}")
+        else:
+            return (False,"invalid move")
 
     def action(self, coords : CoordPair) -> Tuple[bool,int]:
         """Validate and perform an action expressed as a CoordPair."""
