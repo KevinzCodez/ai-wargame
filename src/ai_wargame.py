@@ -294,6 +294,9 @@ class Game:
     def is_valid_move(self, coords: CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         unit = self.get(coords.src)
+        if unit is None or unit.player != self.next_player:
+            return False
+        
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): # Not src/dst coord within the board
             return False
         unit = self.get(coords.dst)
