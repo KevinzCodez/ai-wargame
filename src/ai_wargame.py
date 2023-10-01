@@ -296,13 +296,10 @@ class Game:
         unit = self.get(coords.src)
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): # Not src/dst coord within the board
             return False
-<<<<<<< HEAD
         unit = self.get(coords.dst)
          # return (unit is None) <- i Commented this
         
     # return (unit is None) <- i Commented this
-        
-    #ADDED CODE---------------------------------------------------------------------------------------------
 
         #Checks if the destination is free (no other unit is on it)
         if not (self.is_empty(coords.dst)) :
@@ -321,7 +318,6 @@ class Game:
         #Checks if unit from attacker is AI, Firewall or Program. If it is, unit can only move up or left.
         if (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.col < coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.row < coords.dst.row):
             print("The attacker’s AI, Firewall and Program can only move up or left")
-            print(self.move_candidates())
             return False
         
         #Checks if unit from defender is AI, Firewall or Program. If it is, unit can only move down or right.
@@ -339,25 +335,6 @@ class Game:
                 return True
         return False
 
-    #END OF ADDED CODE -------------------------------------------------------------------------------------
-=======
-        elif unit is None or unit.player != self.next_player: # src is empty or the unit in src does not belong to the current player
-            return False
-        # unit = self.get(coords.dst)
-        else:
-            return True      #(unit is None)
-        
->>>>>>> main
-
-<<<<<<< HEAD
-    def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
-        """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
-        if self.is_valid_move(coords):
-            self.set(coords.dst, self.get(coords.src))
-            self.set(coords.src, None)
-            return (True, "")
-        return (False, "invalid move")
-=======
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. Returns a custom message."""
         target = self.get(coords.dst)
@@ -384,7 +361,6 @@ class Game:
                     else:
                         return (False, f"{target.to_string()} is not adjacent from {source.to_string()}")
         return (False,"invalid move")
->>>>>>> main
 
     def action(self, coords : CoordPair) -> Tuple[bool,int]:
         """Validate and perform an action expressed as a CoordPair."""
@@ -541,7 +517,7 @@ class Game:
             return Player.Defender
 
 
-########################################################################################################### ADDED CODE
+########################################################################################################### 
 class GameTrace:
     def __init__(self, filename):
         self.file = open(filename, 'w')
@@ -623,23 +599,14 @@ def main():
     print(game)
     trace.write_board(game)  # Write the current board state to the trace
     # the main game loop
-<<<<<<< HEAD
-    while True:
+    while not end:
+        end = game.is_finished()
         winner = game.has_winner()
         if winner is not None:
             trace.write_board(game)  # Write the current board state
             trace.write_game_result(winner, game.turns_played)  # Write the game result
             trace.close()  # Close the trace file
-            print(f"{winner.name} wins!")
-=======
-    while not end:
-        end = game.is_finished()
-        print()
-        print(game)
-        winner = game.has_winner()
-        if winner is not None:
             print(f"{winner.name} wins!\n{game.turns_played} turns played")
->>>>>>> main
             break
         if game.options.game_type == GameType.AttackerVsDefender:
             move = game.human_turn()
