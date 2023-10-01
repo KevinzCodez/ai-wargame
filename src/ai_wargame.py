@@ -194,6 +194,11 @@ class CoordPair:
             return coords
         else:
             return None
+    
+    @classmethod
+    def from_dim(cls, dim: int) -> CoordPair:
+        """Create a CoordPair based on a dim-sized rectangle."""
+        return CoordPair(Coord(0,0),Coord(dim-1,dim-1))
 
 ##############################################################################################################
 
@@ -281,21 +286,102 @@ class Game:
 
     def is_valid_move(self, coords : CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
-        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
-            return False
         unit = self.get(coords.src)
-        if unit is None or unit.player != self.next_player:
+        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): # Not src/dst coord within the board
             return False
-        unit = self.get(coords.dst)
-        return (unit is None)
+        elif unit is None or unit.player != self.next_player: # src is empty or the unit in src does not belong to the current player
+            return False
+        # unit = self.get(coords.dst)
+        else:
+            return True      #(unit is None)
+        
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
-        """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        """Validate and perform a move expressed as a CoordPair. Returns a custom message"""
         if self.is_valid_move(coords):
-            self.set(coords.dst,self.get(coords.src))
-            self.set(coords.src,None)
-            return (True,"")
+            if self.is_empty(coords.dst):
+                self.set(coords.dst,self.get(coords.src))
+                self.set(coords.src,None)
+                return (True,"")
+            else:
+                (success, actionType) = self.action(coords)
+                if success:
+                    match actionType:
+                        case 0: 
+                            return (True, "self-destruct")
+                        case 1:
+                            return (True, "repair")
+                        case 2:
+                            return (True, "attack")
+                else:
+                    if actionType == 1:
+                        return (False, "max health reached")
         return (False,"invalid move")
+
+    def action(self, coords : CoordPair) -> Tuple[bool,int]:
+        """Validate and perform an action expressed as a CoordPair."""
+        unit = self.get(coords.dst)
+        if not self.is_empty(coords.dst):
+            if coords.dst == coords.src:
+                self.self_destruct(coords)
+                return (True, 0)
+            elif self.is_adjacent(coords):
+                if self.is_ally(coords.dst):
+                    if unit.health == 9:
+                        return (False, 1)
+                    else:
+                        self.repair(coords)
+                        return (True, 1)
+                else: 
+                    self.attack(coords)
+                    return (True, 2)
+            else:
+                return (False, -1) #make this too personalized invalid message
+        return (False, -1)
+    
+    def self_destruct(self, coords : CoordPair):
+        """Perform a self-destruct action."""
+        unit = self.get(coords.dst)
+        for coord in coords.dst.iter_range(1):
+            if self.get(coord) is not None:
+                self.get(coord).mod_health(-2)
+                self.remove_dead(coord)
+            else:
+                continue
+        unit.mod_health(-unit.health)
+        self.remove_dead(coords.dst)
+
+    def repair(self, coords : CoordPair):
+        """Perform a repair action."""
+        source = self.get(coords.src)
+        target = self.get(coords.dst)
+        target.mod_health(source.repair_amount(target))
+    
+    def attack(self, coords : CoordPair):
+        """Perform an attack action."""
+        source = self.get(coords.src)
+        target = self.get(coords.dst)
+        target.mod_health(-source.damage_amount(target))
+        source.mod_health(-target.damage_amount(source))
+        self.remove_dead(coords.dst)
+        self.remove_dead(coords.src)
+
+    def is_adjacent(self, coords : CoordPair) -> bool:
+        """Check if destination coordinate is adjacent to source coordinate."""
+        for coord in coords.src.iter_adjacent():
+            if coord == coords.dst:
+                return True
+            else:
+                continue
+        return False
+
+
+    def is_ally(self, target : Coord) -> bool:
+        """Check if target unit is an ally or not."""
+        for coord, unit in self.player_units(self.next_player):
+            if coord == target:
+                return True;
+        return False
 
     def next_turn(self):
         """Transitions game to the next turn."""
@@ -427,14 +513,16 @@ def main():
 
     # create a new game
     game = Game(options=options)
+    end = False
 
     # the main game loop
-    while True:
+    while not end:
+        end = game.is_finished()
         print()
         print(game)
         winner = game.has_winner()
         if winner is not None:
-            print(f"{winner.name} wins!")
+            print(f"{winner.name} wins!\n{game.turns_played} turns played")
             break
         if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
