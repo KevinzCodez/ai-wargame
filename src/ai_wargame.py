@@ -297,7 +297,10 @@ class Game:
         
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
-        """Validate and perform a move expressed as a CoordPair. Returns a custom message"""
+        """Validate and perform a move expressed as a CoordPair. Returns a custom message."""
+        target = self.get(coords.dst)
+        source = self.get(coords.src)
+        
         if self.is_valid_move(coords):
             if self.is_empty(coords.dst):
                 self.set(coords.dst,self.get(coords.src))
@@ -308,14 +311,14 @@ class Game:
                 if success:
                     match actionType:
                         case 0: 
-                            return (True, "self-destruct")
+                            return (True, f"{target.to_string()} self-destructed")
                         case 1:
-                            return (True, "repair")
+                            return (True, f"{target.to_string()} was repaired by {source.to_string()}")
                         case 2:
-                            return (True, "attack")
+                            return (True, f"{target.to_string()} was attacked by {source.to_string()}")
                 else:
                     if actionType == 1:
-                        return (False, "max health reached")
+                        return (False, f"{target.to_string()} has max health")
         return (False,"invalid move")
 
     def action(self, coords : CoordPair) -> Tuple[bool,int]:
