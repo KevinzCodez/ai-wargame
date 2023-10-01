@@ -309,8 +309,9 @@ class Game:
             print("The destination must be free (no other unit is on it)")
             return False
         
-        if self.is_in_combat(coords):
-            print("UNIT IS IN COMBATTTTTTTTTT")
+         #Uses the function is_in_combat() to check whether the unit is in combat or not. If unit is in combat, it cannot move
+        if self.is_in_combat(coords) and ((self.board[coords.src.row][coords.src.col].type == UnitType.AI) or (self.board[coords.src.row][coords.src.col].type == UnitType.Firewall) or (self.board[coords.src.row][coords.src.col].type == UnitType.Program)):
+            print("This unit cannot be moved while engaged in combat")
             return False
         
         #Checks if unit is a Tech or Virus. If it is, unit can move up, down, right, left
