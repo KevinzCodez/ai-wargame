@@ -289,12 +289,57 @@ class Game:
         unit = self.get(coords.src)
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): # Not src/dst coord within the board
             return False
+<<<<<<< HEAD
+        unit = self.get(coords.dst)
+         # return (unit is None) <- i Commented this
+        
+    # return (unit is None) <- i Commented this
+        
+    #ADDED CODE---------------------------------------------------------------------------------------------
+
+        #Checks if the destination is free (no other unit is on it)
+        if not (self.is_empty(coords.dst)) :
+            print("The destination must be free (no other unit is on it)")
+            return False
+        
+        if self.is_in_combat(coords):
+            print("UNIT IS IN COMBATTTTTTTTTT")
+            return False
+        
+        #Checks if unit is a Tech or Virus. If it is, unit can move up, down, right, left
+        if(self.board[coords.src.row][coords.src.col].type == UnitType.Tech) or (self.board[coords.src.row][coords.src.col].type == UnitType.Virus):
+            return True
+        
+        #Checks if unit from attacker is AI, Firewall or Program. If it is, unit can only move up or left.
+        if (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.col < coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.row < coords.dst.row):
+            print("The attacker’s AI, Firewall and Program can only move up or left")
+            print(self.move_candidates())
+            return False
+        
+        #Checks if unit from defender is AI, Firewall or Program. If it is, unit can only move down or right.
+        if (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.col > coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.row > coords.dst.row):
+            print("The defender’s AI, Firewall and Program can only move down or right")
+            print(self.get(coords.dst))
+            return False
+        
+        return (unit is None)
+    
+    def is_in_combat(self, coords : CoordPair) -> bool:
+        for i in coords.src.iter_adjacent():
+            adjacent_unit = self.get(i)
+            if (adjacent_unit is not None) and (adjacent_unit.player != self.get(coords.src).player):
+                return True
+        return False
+
+    #END OF ADDED CODE -------------------------------------------------------------------------------------
+=======
         elif unit is None or unit.player != self.next_player: # src is empty or the unit in src does not belong to the current player
             return False
         # unit = self.get(coords.dst)
         else:
             return True      #(unit is None)
         
+>>>>>>> main
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. Returns a custom message."""
