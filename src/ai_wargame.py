@@ -292,7 +292,7 @@ class Game:
             self.remove_dead(coord)
 
     def is_valid_move(self, coords: CoordPair) -> bool:
-        """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        """Validate a move expressed as a CoordPair."""
         unit = self.get(coords.src)
         if unit is None or unit.player != self.next_player:
             return False
@@ -330,59 +330,64 @@ class Game:
         
         return (unit is None)
     
+    def is_valid_action(self, coords: CoordPair) -> bool:
+        """Validate an action expressed as a CoordPair."""
+        unit = self.get(coords.src)
+        if unit is None or unit.player != self.next_player:
+            return False
+        
+        elif not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): # Not src/dst coord within the board
+            return False
+        
+        else: 
+            return True
+    
     def is_in_combat(self, coords : CoordPair) -> bool:
+        """Validate if unit is engaged in combat."""
         for i in coords.src.iter_adjacent():
             adjacent_unit = self.get(i)
             if (adjacent_unit is not None) and (adjacent_unit.player != self.get(coords.src).player):
                 return True
         return False
 
-    def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
+    def perform_move(self, coords : CoordPair) -> Tuple[bool,str,int]:
         """Validate and perform a move expressed as a CoordPair. Returns a custom message."""
-        target = self.get(coords.dst)
-        source = self.get(coords.src)
-
+        # Flag: movement = 0
         if self.is_empty(coords.dst) and self.is_valid_move(coords):
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
-                return (True,"")
+                return (True,"",0)
                     
-        elif not self.is_empty(coords.dst):
-            (success, actionType) = self.action(coords)
+        elif not self.is_empty(coords.dst) and self.is_valid_action(coords):
+            (success, message, actionType) = self.action(coords)
             if success:
-                match actionType:
-                    case 0: 
-                        return (True, f"{target.to_string()} self-destructed")
-                    case 1:
-                        return (True, f"{target.to_string()} was repaired by {source.to_string()}")
-                    case 2:
-                        return (True, f"{target.to_string()} was attacked by {source.to_string()}")
+                return (True, message, actionType)
             else:
-                if actionType == 1:
-                    return (False, f"{target.to_string()} already has max health")
-                else:
-                    return (False, f"{target.to_string()} is not adjacent from {source.to_string()}")
+                return (False, message, -1)
         else:
-            return (False,"invalid move")
+            return (False,"", -1)
 
-    def action(self, coords : CoordPair) -> Tuple[bool,int]:
+    def action(self, coords : CoordPair) -> Tuple[bool, str, int]:
         """Validate and perform an action expressed as a CoordPair."""
-        unit = self.get(coords.dst)
+        # Flags: self-destruct = 1, repair = 2, attack = 3
+        target = self.get(coords.dst)
+        source = self.get(coords.src)
         if coords.dst == coords.src:
             self.self_destruct(coords)
-            return (True, 0)
+            return (True, f"{target.to_string()} self-destructed", 1)
         elif self.is_adjacent(coords):
             if self.is_ally(coords.dst):
-                if unit.health == 9:
-                    return (False, 1)
+                if target.health == 9:
+                    return (False, f"{target.to_string()} already has max health", -1)
                 else:
-                    self.repair(coords)
-                    return (True, 1)
+                    if self.repair(coords) == 0:
+                        return (False, f"{source.to_string()} cannot repair {target.to_string()}", -1)
+                    return (True, f"{target.to_string()} was repaired by {source.to_string()}", 2)
             else: 
                 self.attack(coords)
-                return (True, 2)
+                return (True, f"{target.to_string()} was attacked by {source.to_string()}", 3)
         else:
-                return (False, -1) #make this too personalized invalid message
+                return (False, "", -1) #make this too personalized invalid message
     
     def self_destruct(self, coords : CoordPair):
         """Perform a self-destruct action."""
@@ -396,11 +401,13 @@ class Game:
         unit.mod_health(-unit.health)
         self.remove_dead(coords.dst)
 
-    def repair(self, coords : CoordPair):
+    def repair(self, coords : CoordPair) -> int:
         """Perform a repair action."""
         source = self.get(coords.src)
         target = self.get(coords.dst)
-        target.mod_health(source.repair_amount(target))
+        amount = source.repair_amount(target)
+        target.mod_health(amount)
+        return amount
     
     def attack(self, coords : CoordPair):
         """Perform an attack action."""
@@ -485,16 +492,18 @@ class Game:
         """Human player plays a move."""
         while True:
             mv = self.read_move()
-            (success, result) = self.perform_move(mv)
+            (success, result, actionType) = self.perform_move(mv)
             if success:
                 print(f"Player {self.next_player.name}: ", end='')
                 print(result)
                 self.next_turn()
                 print("\n" + str(self))  # Print the board to the terminal
-                return mv
+                move = (mv, actionType)
+                return move
             else:
                 print(result)
                 print("The move is not valid! Try again.")
+                move = (None, actionType)
 
     def player_units(self, player: Player) -> Iterable[Tuple[Coord, Unit]]:
         """Iterates over all units belonging to a player."""
@@ -538,7 +547,19 @@ class GameTrace:
 
     def write_action(self, turn, player, action):
         self.file.write(f"Turn #{turn} - {player.next().name}\n")
-        self.file.write(f"Action: {action}\n")
+        (coords, actionType) = action
+        string = ""
+        match actionType:
+            case 0:
+                string = "move"
+            case 1:
+                string = "self-destruct"
+            case 2:
+                string = "repair"
+            case 3:
+                string = "attack"
+
+        self.file.write(f"Action: {string} from {coords.src} to {coords.dst}\n")
         self.file.flush()  # Flush the buffer
 
     def write_game_result(self, winner, turns_played):
