@@ -300,7 +300,7 @@ class Game:
         """Validate and perform a move expressed as a CoordPair. Returns a custom message."""
         target = self.get(coords.dst)
         source = self.get(coords.src)
-        
+
         if self.is_valid_move(coords):
             if self.is_empty(coords.dst):
                 self.set(coords.dst,self.get(coords.src))
@@ -318,29 +318,29 @@ class Game:
                             return (True, f"{target.to_string()} was attacked by {source.to_string()}")
                 else:
                     if actionType == 1:
-                        return (False, f"{target.to_string()} has max health")
+                        return (False, f"{target.to_string()} already has max health")
+                    else:
+                        return (False, f"{target.to_string()} is not adjacent from {source.to_string()}")
         return (False,"invalid move")
 
     def action(self, coords : CoordPair) -> Tuple[bool,int]:
         """Validate and perform an action expressed as a CoordPair."""
         unit = self.get(coords.dst)
-        if not self.is_empty(coords.dst):
-            if coords.dst == coords.src:
-                self.self_destruct(coords)
-                return (True, 0)
-            elif self.is_adjacent(coords):
-                if self.is_ally(coords.dst):
-                    if unit.health == 9:
-                        return (False, 1)
-                    else:
-                        self.repair(coords)
-                        return (True, 1)
-                else: 
-                    self.attack(coords)
-                    return (True, 2)
-            else:
+        if coords.dst == coords.src:
+            self.self_destruct(coords)
+            return (True, 0)
+        elif self.is_adjacent(coords):
+            if self.is_ally(coords.dst):
+                if unit.health == 9:
+                    return (False, 1)
+                else:
+                    self.repair(coords)
+                    return (True, 1)
+            else: 
+                self.attack(coords)
+                return (True, 2)
+        else:
                 return (False, -1) #make this too personalized invalid message
-        return (False, -1)
     
     def self_destruct(self, coords : CoordPair):
         """Perform a self-destruct action."""
@@ -450,6 +450,7 @@ class Game:
                 self.next_turn()
                 break
             else:
+                print(result)
                 print("The move is not valid! Try again.")
 
     def player_units(self, player: Player) -> Iterable[Tuple[Coord,Unit]]:
