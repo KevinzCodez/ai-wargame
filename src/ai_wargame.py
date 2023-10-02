@@ -292,18 +292,18 @@ class Game:
             self.remove_dead(coord)
 
     def is_valid_move(self, coords: CoordPair) -> bool:
-        """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        """Validate a move expressed as a CoordPair."""
 
-        #Checks if its a valid coorrd
+        #Checks if its a valid coord within the board
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): # Not src/dst coord within the board
             return False
         
-        #Checks if unit srcs is the player unit
+        #Checks if unit source is the player's unit
         if self.get(coords.src) is None or self.get(coords.src).player != self.next_player:
             return False
     
         #Checks if the destination coordinate is an adjacent coord
-        if coords.dst not in Coord.iter_adjacent(coords.src) and coords.dst != coords.src:
+        if not self.is_adjacent(coords):
             print("You can only move to adjacent coordinates.")
             return False
         
@@ -334,7 +334,7 @@ class Game:
         if unit is None or unit.player != self.next_player:
             return False
         
-        elif not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): # Not src/dst coord within the board
+        elif not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): 
             return False
         
         else: 
@@ -349,7 +349,7 @@ class Game:
         return False
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str,int]:
-        """Validate and perform a move expressed as a CoordPair. Returns a custom message."""
+        """Validate and perform a move expressed as a CoordPair."""
         # Flag: movement = 0
         if self.is_empty(coords.dst) and self.is_valid_move(coords):
                 self.set(coords.dst,self.get(coords.src))
@@ -385,7 +385,7 @@ class Game:
                 self.attack(coords)
                 return (True, f"{target.to_string()} was attacked by {source.to_string()}", 3)
         else:
-                return (False, "", -1) #make this too personalized invalid message
+                return (False, "", -1) 
     
     def self_destruct(self, coords : CoordPair):
         """Perform a self-destruct action."""
@@ -561,7 +561,7 @@ class GameTrace:
         self.file.flush()  # Flush the buffer
 
     def write_game_result(self, winner, turns_played):
-        self.file.write(f"4. The winner of the game ({winner.name}) wins in {turns_played} turns\n")
+        self.file.write(f"The winner of the game ({winner.name}) wins in {turns_played} turns\n")
         self.file.flush()  # Flush the buffer
     def close(self):
         self.file.close()
