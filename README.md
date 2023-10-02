@@ -17,11 +17,11 @@ python3 src/ai_wargame.py -h
 ```
 ### Options
 The different changes you can make:
-Help: -h, --help
-Max search time (default: None): --max_time MAX_TIME
-Max turns before end of game (default: None): --max_turns MAX_TURNS
-Alpha-beta on/off (default: None): --alpha_beta ALPHA_BETA
-Game type: auto|attacker|defender|manual (default:manual): --game_type {auto,attacker,defender,manual}
+- Help: -h, --help
+- Max search time (default: None): --max_time MAX_TIME
+- Max turns before end of game (default: None): --max_turns MAX_TURNS
+- Alpha-beta on/off (default: None): --alpha_beta ALPHA_BETA
+- Game type: auto|attacker|defender|manual (default:manual): --game_type {auto,attacker,defender,manual}
 
 
 
