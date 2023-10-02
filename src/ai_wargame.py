@@ -292,20 +292,19 @@ class Game:
             self.remove_dead(coord)
 
     def is_valid_move(self, coords: CoordPair) -> bool:
-        """Validate a move expressed as a CoordPair."""
-        unit = self.get(coords.src)
-        if unit is None or unit.player != self.next_player:
-            return False
-        
+        """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+
+        #Checks if its a valid coorrd
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): # Not src/dst coord within the board
             return False
-        unit = self.get(coords.dst)
-         # return (unit is None) <- i Commented this
         
-    # return (unit is None) <- i Commented this
-        #Checking that the destination coordinate is an adjacent square
+        #Checks if unit srcs is the player unit
+        if self.get(coords.src) is None or self.get(coords.src).player != self.next_player:
+            return False
+    
+        #Checks if the destination coordinate is an adjacent coord
         if coords.dst not in Coord.iter_adjacent(coords.src) and coords.dst != coords.src:
-            print("Your destination coordinate is not adjacent to the source coordinate.")
+            print("You can only move to adjacent coordinates.")
             return False
         
         #Uses the function is_in_combat() to check whether the unit is in combat or not. If unit is in combat, it cannot move
@@ -325,10 +324,9 @@ class Game:
         #Checks if unit from defender is AI, Firewall or Program. If it is, unit can only move down or right.
         if (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.col > coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.row > coords.dst.row):
             print("The defender’s AI, Firewall and Program can only move down or right")
-            print(self.get(coords.dst))
             return False
         
-        return (unit is None)
+        return True
     
     def is_valid_action(self, coords: CoordPair) -> bool:
         """Validate an action expressed as a CoordPair."""
