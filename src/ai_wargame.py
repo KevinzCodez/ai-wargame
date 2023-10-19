@@ -569,7 +569,7 @@ class Game:
         beta = MAX_HEURISTIC_SCORE
         
         # start with min depth then half way the game switch to max depth
-        if self.turns_played < 100 * 0.5:
+        if self.turns_played < self.options.max_turns * 0.5:
             depth = self.options.min_depth
         else:
             depth = self.options.max_depth
@@ -734,8 +734,8 @@ def main():
         prog='ai_wargame',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--max_time', type=float, help='maximum search time')
-    parser.add_argument('--max_turns', type=int, help='maximum turns before end of game')
-    parser.add_argument('--alpha_beta', type=bool, help='alpha-beta on/off')
+    parser.add_argument('--max_turns', type=int, help='maximum turns before end of game', default=100)
+    parser.add_argument('--alpha_beta', type=bool, help='alpha-beta on/off', default=False)
     parser.add_argument('--game_type', type=str, choices=["auto", "attacker", "defender", "manual"], default="defender",
                         help='game type: auto|attacker|defender|manual')
     args = parser.parse_args()
