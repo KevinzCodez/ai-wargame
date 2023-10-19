@@ -6,6 +6,9 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import Tuple, Iterable, ClassVar
 
+# maximum and minimum values for our heuristic scores (usually represents an end of game condition)
+MAX_HEURISTIC_SCORE = 2000000000
+MIN_HEURISTIC_SCORE = -2000000000
 
 # maximum and minimum values for our heuristic scores (usually represents an end of game condition)
 MAX_HEURISTIC_SCORE = 2000000000
@@ -204,11 +207,11 @@ class CoordPair:
             return coords
         else:
             return None
-    
+
     @classmethod
     def from_dim(cls, dim: int) -> CoordPair:
         """Create a CoordPair based on a dim-sized rectangle."""
-        return CoordPair(Coord(0,0),Coord(dim-1,dim-1))
+        return CoordPair(Coord(0, 0), Coord(dim - 1, dim - 1))
 
 
 ##############################################################################################################
@@ -236,6 +239,105 @@ class Game:
     options: Options = field(default_factory=Options)
     _attacker_has_ai: bool = True
     _defender_has_ai: bool = True
+
+    def count_units_for_player(self, player: Player) -> dict:
+        """Counts the units for a specific player on the board."""
+        units_count = {
+            'AI': 0,
+            'Virus': 0,
+            'Tech': 0,
+            'Firewall': 0,
+            'Program': 0
+        }
+
+        for row in self.board:
+            for cell in row:
+                if cell and cell.player == player:
+                    units_count[cell.type.name] += 1
+
+        return units_count
+
+    def compute_value_for_player(self, player: Player) -> int:
+        """Computes the total value for the given player based on the number of units on the board."""
+        player_units = self.count_units_for_player(player)
+        V, T, F, P, AI = player_units['Virus'], player_units['Tech'], player_units['Firewall'], player_units['Program'], \
+        player_units['AI']
+
+        return 3 * V + 3 * T + 3 * F + 3 * P + 9999 * AI
+
+    def e0(self) -> int:
+        """Computes the difference in total value between the two players."""
+        value_attacker = self.compute_value_for_player(Player.Attacker)
+        value_defender = self.compute_value_for_player(Player.Defender)
+
+        return value_attacker - value_defender
+
+    """Here, the idea is simple of the heuristic e0 is to count the number of units for each player and take the difference."""
+    """If e0 is positive, it means Player 1 has more units (or if both sides have same number of units, then evaluates which one has better units), and vice versa. """
+    """The purpose of this heuristic is to favor game states where you have more units on the board than your opponent."""
+    """Basically, if one side has more units and/or better units then we return exactly that """
+
+    def e1(self, board):
+        weights = {
+            'A': 10000,
+            'V': 2,
+            'T': 1,
+            'P': 1,
+            'F': 5
+        }
+
+        value_p1 = 0  # attacker
+        value_p2 = 0  # defender
+
+        for row in board:
+            for cell in row:
+                if cell:
+                    unit = cell[1]  # 'A', 'V', 'T', 'P', 'F'
+                    player = cell[0]  # 'a' or 'd'
+
+                    if player == 'a':
+                        value_p1 += weights[unit]
+                    else:
+                        value_p2 += weights[unit]
+
+        return value_p1 - value_p2
+
+    """This heuristic emphasizes the protection of the AI while also focusing on attacking the enemy AI. It is a slight refinement of e0."""
+    """The AI is given a very high weight (10000) to make its survival the top priority. Firewalls are given a slightly higher weight (5) than other units because they absorb attacks well.  """
+    """Viruses have a weight of 2 because they pose a significant threat with their ability to destroy the AI in one attack."""
+
+    def e2(self, board):
+        weights = {
+            'A': 10000,
+            'V': 3,
+            'T': 1,
+            'P': 2,
+            'F': 1
+        }
+
+        value_p1 = 0  # attacker
+        value_p2 = 0  # defender
+
+        for row in board:
+            for cell in row:
+                if cell:
+                    unit = cell[1]  # 'A', 'V', 'T', 'P', 'F'
+                    player = cell[0]  # 'a' or 'd'
+                    health = int(cell[2])  # 0-9
+
+                    if player == 'a':
+                        value_p1 += weights[unit] * health
+                    else:
+                        value_p2 += weights[unit] * health
+
+        return value_p1 - value_p2
+
+    """e2 takes the concept further by not just counting the number of units, but by also considering the health of those units. """
+    """Units with higher health are more likely to survive combat, so the heuristic values states where your units have more health. """
+    """The AI's health is given the highest weight due to its importance. Offensive units like Viruses and Programs have slightly higher weights (3 and 2 respectively) 
+    to reflect their attacking capabilities. """
+    """Defensive units like Techs and Firewalls get slightly lower weights, but still, their health is factored into the calculation."""
+
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
@@ -300,29 +402,57 @@ class Game:
     def is_valid_move(self, coords: CoordPair, bot) -> bool:
         """Validate a move expressed as a CoordPair."""
 
-        #Checks if its a valid coord within the board
-        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): # Not src/dst coord within the board
+        # Checks if its a valid coord within the board
+        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(
+                coords.dst):  # Not src/dst coord within the board
             return False
-        
-        #Checks if unit source is the player's unit
+
+        # Checks if unit source is the player's unit
         if self.get(coords.src) is None or self.get(coords.src).player != self.next_player:
             return False
-    
-        #Checks if the destination coordinate is an adjacent coord
+
+        # Checks if the destination coordinate is an adjacent coord
         if not self.is_adjacent(coords):
             if not bot:
                 print("You can only move to adjacent coordinates.")
             return False
+<<<<<<< HEAD
+
+        # Uses the function is_in_combat() to check whether the unit is in combat or not. If unit is in combat, it cannot move
+        if self.is_in_combat(coords) and ((self.board[coords.src.row][coords.src.col].type == UnitType.AI) or (
+                self.board[coords.src.row][coords.src.col].type == UnitType.Firewall) or (
+                                                  self.board[coords.src.row][coords.src.col].type == UnitType.Program)):
+            print("This unit cannot be moved while engaged in combat")
+=======
         
         #Uses the function is_in_combat() to check whether the unit is in combat or not. If unit is in combat, it cannot move
         if self.is_in_combat(coords) and ((self.board[coords.src.row][coords.src.col].type == UnitType.AI) or (self.board[coords.src.row][coords.src.col].type == UnitType.Firewall) or (self.board[coords.src.row][coords.src.col].type == UnitType.Program)):
             if not bot:
                 print("This unit cannot be moved while engaged in combat")
+>>>>>>> main
             return False
-        
-        #Checks if unit is a Tech or Virus. If it is, unit can move up, down, right, left
-        if(self.board[coords.src.row][coords.src.col].type == UnitType.Tech) or (self.board[coords.src.row][coords.src.col].type == UnitType.Virus):
+
+        # Checks if unit is a Tech or Virus. If it is, unit can move up, down, right, left
+        if (self.board[coords.src.row][coords.src.col].type == UnitType.Tech) or (
+                self.board[coords.src.row][coords.src.col].type == UnitType.Virus):
             return True
+<<<<<<< HEAD
+
+        # Checks if unit from attacker is AI, Firewall or Program. If it is, unit can only move up or left.
+        if (self.board[coords.src.row][
+                coords.src.col].player == Player.Attacker and coords.src.col < coords.dst.col) or (
+                self.board[coords.src.row][
+                    coords.src.col].player == Player.Attacker and coords.src.row < coords.dst.row):
+            print("The attacker’s AI, Firewall and Program can only move up or left")
+            return False
+
+        # Checks if unit from defender is AI, Firewall or Program. If it is, unit can only move down or right.
+        if (self.board[coords.src.row][
+                coords.src.col].player == Player.Defender and coords.src.col > coords.dst.col) or (
+                self.board[coords.src.row][
+                    coords.src.col].player == Player.Defender and coords.src.row > coords.dst.row):
+            print("The defender’s AI, Firewall and Program can only move down or right")
+=======
         
         #Checks if unit from attacker is AI, Firewall or Program. If it is, unit can only move up or left.
         if (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.col < coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.row < coords.dst.row):
@@ -334,23 +464,24 @@ class Game:
         if (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.col > coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.row > coords.dst.row):
             if not bot:
                 print("The defender’s AI, Firewall and Program can only move down or right")
+>>>>>>> main
             return False
-        
+
         return True
-    
+
     def is_valid_action(self, coords: CoordPair) -> bool:
         """Validate an action expressed as a CoordPair."""
         unit = self.get(coords.src)
         if unit is None or unit.player != self.next_player:
             return False
-        
-        elif not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst): 
+
+        elif not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
-        
-        else: 
+
+        else:
             return True
-    
-    def is_in_combat(self, coords : CoordPair) -> bool:
+
+    def is_in_combat(self, coords: CoordPair) -> bool:
         """Validate if unit is engaged in combat."""
         for i in coords.src.iter_adjacent():
             adjacent_unit = self.get(i)
@@ -358,14 +489,22 @@ class Game:
                 return True
         return False
 
-    def perform_move(self, coords : CoordPair) -> Tuple[bool,str,int]:
+    def perform_move(self, coords: CoordPair) -> Tuple[bool, str, int]:
         """Validate and perform a move expressed as a CoordPair."""
         # Flag: movement = 0
+<<<<<<< HEAD
+        if self.is_empty(coords.dst) and self.is_valid_move(coords):
+            self.set(coords.dst, self.get(coords.src))
+            self.set(coords.src, None)
+            return (True, "", 0)
+
+=======
         if self.is_empty(coords.dst) and self.is_valid_move(coords, False):
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
                 return (True,"",0)
                     
+>>>>>>> main
         elif not self.is_empty(coords.dst) and self.is_valid_action(coords):
             (success, message, actionType) = self.action(coords)
             if success:
@@ -373,9 +512,9 @@ class Game:
             else:
                 return (False, message, -1)
         else:
-            return (False,"", -1)
+            return (False, "", -1)
 
-    def action(self, coords : CoordPair) -> Tuple[bool, str, int]:
+    def action(self, coords: CoordPair) -> Tuple[bool, str, int]:
         """Validate and perform an action expressed as a CoordPair."""
         # Flags: self-destruct = 1, repair = 2, attack = 3
         target = self.get(coords.dst)
@@ -391,13 +530,13 @@ class Game:
                     if self.repair(coords) == 0:
                         return (False, f"{source.to_string()} cannot repair {target.to_string()}", -1)
                     return (True, f"{target.to_string()} was repaired by {source.to_string()}", 2)
-            else: 
+            else:
                 self.attack(coords)
                 return (True, f"{target.to_string()} was attacked by {source.to_string()}", 3)
         else:
-                return (False, "", -1) 
-    
-    def self_destruct(self, coords : CoordPair):
+            return (False, "", -1)
+
+    def self_destruct(self, coords: CoordPair):
         """Perform a self-destruct action."""
         unit = self.get(coords.dst)
         for coord in coords.dst.iter_range(1):
@@ -409,15 +548,15 @@ class Game:
         unit.mod_health(-unit.health)
         self.remove_dead(coords.dst)
 
-    def repair(self, coords : CoordPair) -> int:
+    def repair(self, coords: CoordPair) -> int:
         """Perform a repair action."""
         source = self.get(coords.src)
         target = self.get(coords.dst)
         amount = source.repair_amount(target)
         target.mod_health(amount)
         return amount
-    
-    def attack(self, coords : CoordPair):
+
+    def attack(self, coords: CoordPair):
         """Perform an attack action."""
         source = self.get(coords.src)
         target = self.get(coords.dst)
@@ -426,7 +565,7 @@ class Game:
         self.remove_dead(coords.dst)
         self.remove_dead(coords.src)
 
-    def is_adjacent(self, coords : CoordPair) -> bool:
+    def is_adjacent(self, coords: CoordPair) -> bool:
         """Check if destination coordinate is adjacent to source coordinate."""
         for coord in coords.src.iter_adjacent():
             if coord == coords.dst:
@@ -435,8 +574,7 @@ class Game:
                 continue
         return False
 
-
-    def is_ally(self, target : Coord) -> bool:
+    def is_ally(self, target: Coord) -> bool:
         """Check if target unit is an ally or not."""
         for coord, unit in self.player_units(self.next_player):
             if coord == target:
@@ -688,7 +826,7 @@ class Game:
         return Player.Defender
 
 
-########################################################################################################### 
+###########################################################################################################
 class GameTrace:
     def __init__(self, filename):
         self.file = open(filename, 'w')
@@ -724,8 +862,10 @@ class GameTrace:
     def write_game_result(self, winner, turns_played):
         self.file.write(f"The winner of the game ({winner.name}) wins in {turns_played} turns\n")
         self.file.flush()  # Flush the buffer
+
     def close(self):
         self.file.close()
+
 
 ##############################################################################################################
 def main():
@@ -739,6 +879,7 @@ def main():
     parser.add_argument('--game_type', type=str, choices=["auto", "attacker", "defender", "manual"], default="defender",
                         help='game type: auto|attacker|defender|manual')
     args = parser.parse_args()
+
 
     # Initialize the GameTrace
     filename = f"gameTrace-{'true' if args.alpha_beta else 'false'}-{args.max_time}-{args.max_turns}.txt"
@@ -807,4 +948,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
