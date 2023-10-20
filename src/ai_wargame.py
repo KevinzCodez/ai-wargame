@@ -240,47 +240,10 @@ class Game:
     _attacker_has_ai: bool = True
     _defender_has_ai: bool = True
 
-    def count_units_for_player(self, player: Player) -> dict:
-        """Counts the units for a specific player on the board."""
-        units_count = {
-            'AI': 0,
-            'Virus': 0,
-            'Tech': 0,
-            'Firewall': 0,
-            'Program': 0
-        }
-
-        for row in self.board:
-            for cell in row:
-                if cell and cell.player == player:
-                    units_count[cell.type.name] += 1
-
-        return units_count
-
-    def compute_value_for_player(self, player: Player) -> int:
-        """Computes the total value for the given player based on the number of units on the board."""
-        player_units = self.count_units_for_player(player)
-        V, T, F, P, AI = player_units['Virus'], player_units['Tech'], player_units['Firewall'], player_units['Program'], \
-        player_units['AI']
-
-        return 3 * V + 3 * T + 3 * F + 3 * P + 9999 * AI
-
-    def e0(self) -> int:
-        """Computes the difference in total value between the two players."""
-        value_attacker = self.compute_value_for_player(Player.Attacker)
-        value_defender = self.compute_value_for_player(Player.Defender)
-
-        return value_attacker - value_defender
-
-    """Here, the idea is simple of the heuristic e0 is to count the number of units for each player and take the difference."""
-    """If e0 is positive, it means Player 1 has more units (or if both sides have same number of units, then evaluates which one has better units), and vice versa. """
-    """The purpose of this heuristic is to favor game states where you have more units on the board than your opponent."""
-    """Basically, if one side has more units and/or better units then we return exactly that """
-
-    def e1(self, board):
+    def e1(self):
         weights = {
             'A': 10000,
-            'V': 2,
+            'V': 3,
             'T': 1,
             'P': 1,
             'F': 5
@@ -289,7 +252,7 @@ class Game:
         value_p1 = 0  # attacker
         value_p2 = 0  # defender
 
-        for row in board:
+        for row in self.board:
             for cell in row:
                 if cell:
                     unit = cell[1]  # 'A', 'V', 'T', 'P', 'F'
@@ -416,43 +379,17 @@ class Game:
             if not bot:
                 print("You can only move to adjacent coordinates.")
             return False
-<<<<<<< HEAD
-
-        # Uses the function is_in_combat() to check whether the unit is in combat or not. If unit is in combat, it cannot move
-        if self.is_in_combat(coords) and ((self.board[coords.src.row][coords.src.col].type == UnitType.AI) or (
-                self.board[coords.src.row][coords.src.col].type == UnitType.Firewall) or (
-                                                  self.board[coords.src.row][coords.src.col].type == UnitType.Program)):
-            print("This unit cannot be moved while engaged in combat")
-=======
         
         #Uses the function is_in_combat() to check whether the unit is in combat or not. If unit is in combat, it cannot move
         if self.is_in_combat(coords) and ((self.board[coords.src.row][coords.src.col].type == UnitType.AI) or (self.board[coords.src.row][coords.src.col].type == UnitType.Firewall) or (self.board[coords.src.row][coords.src.col].type == UnitType.Program)):
             if not bot:
                 print("This unit cannot be moved while engaged in combat")
->>>>>>> main
             return False
 
         # Checks if unit is a Tech or Virus. If it is, unit can move up, down, right, left
         if (self.board[coords.src.row][coords.src.col].type == UnitType.Tech) or (
                 self.board[coords.src.row][coords.src.col].type == UnitType.Virus):
             return True
-<<<<<<< HEAD
-
-        # Checks if unit from attacker is AI, Firewall or Program. If it is, unit can only move up or left.
-        if (self.board[coords.src.row][
-                coords.src.col].player == Player.Attacker and coords.src.col < coords.dst.col) or (
-                self.board[coords.src.row][
-                    coords.src.col].player == Player.Attacker and coords.src.row < coords.dst.row):
-            print("The attacker’s AI, Firewall and Program can only move up or left")
-            return False
-
-        # Checks if unit from defender is AI, Firewall or Program. If it is, unit can only move down or right.
-        if (self.board[coords.src.row][
-                coords.src.col].player == Player.Defender and coords.src.col > coords.dst.col) or (
-                self.board[coords.src.row][
-                    coords.src.col].player == Player.Defender and coords.src.row > coords.dst.row):
-            print("The defender’s AI, Firewall and Program can only move down or right")
-=======
         
         #Checks if unit from attacker is AI, Firewall or Program. If it is, unit can only move up or left.
         if (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.col < coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Attacker and coords.src.row < coords.dst.row):
@@ -464,7 +401,6 @@ class Game:
         if (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.col > coords.dst.col) or (self.board[coords.src.row][coords.src.col].player == Player.Defender and coords.src.row > coords.dst.row):
             if not bot:
                 print("The defender’s AI, Firewall and Program can only move down or right")
->>>>>>> main
             return False
 
         return True
@@ -492,19 +428,11 @@ class Game:
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str, int]:
         """Validate and perform a move expressed as a CoordPair."""
         # Flag: movement = 0
-<<<<<<< HEAD
-        if self.is_empty(coords.dst) and self.is_valid_move(coords):
-            self.set(coords.dst, self.get(coords.src))
-            self.set(coords.src, None)
-            return (True, "", 0)
-
-=======
         if self.is_empty(coords.dst) and self.is_valid_move(coords, False):
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
                 return (True,"",0)
                     
->>>>>>> main
         elif not self.is_empty(coords.dst) and self.is_valid_action(coords):
             (success, message, actionType) = self.action(coords)
             if success:
@@ -663,7 +591,12 @@ class Game:
                 print("\n" + str(self))
         return mv
     
-    def heuristic_e0(self) -> int:
+    """Here, the idea is simple of the heuristic e0 is to count the number of units for each player and take the difference."""
+    """If e0 is positive, it means Player 1 has more units (or if both sides have same number of units, then evaluates which one has better units), and vice versa. """
+    """The purpose of this heuristic is to favor game states where you have more units on the board than your opponent."""
+    """Basically, if one side has more units and/or better units then we return exactly that """
+
+    def e0(self) -> int:
         """Calculate the heuristic value e0 based on the provided formula."""
         VP1 = TP1 = FP1 = PP1 = AIP1 = 0
         VP2 = TP2 = FP2 = PP2 = AIP2 = 0
@@ -714,6 +647,7 @@ class Game:
 
         #(score, move) = self.minimax(depth, maxPlayer, alpha_beta, alpha, beta)
         (score, move) = self.minimax(depth, maxPlayer, alpha_beta, alpha, beta)
+        
 
         # Output
         # start_time = datetime.now()
@@ -731,7 +665,7 @@ class Game:
         # print(f"Elapsed time: {elapsed_seconds:0.1f}s")
         return move
     
-    def minimax(self, depth, maxPlayer, alpha_beta, alpha, beta) -> int:
+    def minimax(self, depth, maxPlayer, alpha_beta, alpha, beta) -> Tuple[int, CoordPair]:
         if depth == 0 or self.is_finished():
             return (self.evaluate(), None)
         
@@ -769,7 +703,9 @@ class Game:
         return (best_score, best_move)
     
     def evaluate(self):
-        return self.heuristic_e0()
+        x = self.e1()
+        print(x)
+        return x
 
     def generate_moves(self) -> Iterable[CoordPair]:
         move = CoordPair()
