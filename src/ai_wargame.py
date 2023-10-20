@@ -227,6 +227,13 @@ class Options:
     alpha_beta: bool = True
     max_turns: int | None = 100
 
+##############################################################################################################
+
+@dataclass(slots=True)
+class Stats:
+    """Representation of the global game statistics."""
+    evaluations_per_depth : dict[int,int] = field(default_factory=dict)
+    total_seconds: float = 0.0
 
 ##############################################################################################################
 
@@ -237,16 +244,17 @@ class Game:
     next_player: Player = Player.Attacker
     turns_played: int = 0
     options: Options = field(default_factory=Options)
+    stats: Stats = field(default_factory=Stats)
     _attacker_has_ai: bool = True
     _defender_has_ai: bool = True
 
     def e1(self):
         weights = {
-            'A': 10000,
-            'V': 3,
-            'T': 1,
-            'P': 1,
-            'F': 5
+            UnitType.AI: 10000,
+            UnitType.Virus: 3,
+            UnitType.Tech: 1,
+            UnitType.Firewall: 5,
+            UnitType.Program: 1
         }
 
         value_p1 = 0  # attacker
@@ -255,13 +263,13 @@ class Game:
         for row in self.board:
             for cell in row:
                 if cell:
-                    unit = cell[1]  # 'A', 'V', 'T', 'P', 'F'
-                    player = cell[0]  # 'a' or 'd'
+                    unit_type = cell.type  # get the unit type from the Unit instance
+                    player = cell.player  # get the player from the Unit instance
 
-                    if player == 'a':
-                        value_p1 += weights[unit]
+                    if player == Player.Attacker:
+                        value_p1 += weights[unit_type]
                     else:
-                        value_p2 += weights[unit]
+                        value_p2 += weights[unit_type]
 
         return value_p1 - value_p2
 
@@ -704,7 +712,7 @@ class Game:
     
     def evaluate(self):
         x = self.e1()
-        print(x)
+        # print(x)
         return x
 
     def generate_moves(self) -> Iterable[CoordPair]:
