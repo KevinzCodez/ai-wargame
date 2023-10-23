@@ -4,6 +4,7 @@ import copy
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
+import random
 from typing import Tuple, Iterable, ClassVar
 
 # maximum and minimum values for our heuristic scores (usually represents an end of game condition)
@@ -247,68 +248,6 @@ class Game:
     stats: Stats = field(default_factory=Stats)
     _attacker_has_ai: bool = True
     _defender_has_ai: bool = True
-
-    def e1(self):
-        weights = {
-            UnitType.AI: 10000,
-            UnitType.Virus: 3,
-            UnitType.Tech: 1,
-            UnitType.Firewall: 5,
-            UnitType.Program: 1
-        }
-
-        value_p1 = 0  # attacker
-        value_p2 = 0  # defender
-
-        for row in self.board:
-            for cell in row:
-                if cell:
-                    unit_type = cell.type  # get the unit type from the Unit instance
-                    player = cell.player  # get the player from the Unit instance
-
-                    if player == Player.Attacker:
-                        value_p1 += weights[unit_type]
-                    else:
-                        value_p2 += weights[unit_type]
-
-        return value_p1 - value_p2
-
-    """This heuristic emphasizes the protection of the AI while also focusing on attacking the enemy AI. It is a slight refinement of e0."""
-    """The AI is given a very high weight (10000) to make its survival the top priority. Firewalls are given a slightly higher weight (5) than other units because they absorb attacks well.  """
-    """Viruses have a weight of 2 because they pose a significant threat with their ability to destroy the AI in one attack."""
-
-    def e2(self, board):
-        weights = {
-            'A': 10000,
-            'V': 3,
-            'T': 1,
-            'P': 2,
-            'F': 1
-        }
-
-        value_p1 = 0  # attacker
-        value_p2 = 0  # defender
-
-        for row in board:
-            for cell in row:
-                if cell:
-                    unit = cell[1]  # 'A', 'V', 'T', 'P', 'F'
-                    player = cell[0]  # 'a' or 'd'
-                    health = int(cell[2])  # 0-9
-
-                    if player == 'a':
-                        value_p1 += weights[unit] * health
-                    else:
-                        value_p2 += weights[unit] * health
-
-        return value_p1 - value_p2
-
-    """e2 takes the concept further by not just counting the number of units, but by also considering the health of those units. """
-    """Units with higher health are more likely to survive combat, so the heuristic values states where your units have more health. """
-    """The AI's health is given the highest weight due to its importance. Offensive units like Viruses and Programs have slightly higher weights (3 and 2 respectively) 
-    to reflect their attacking capabilities. """
-    """Defensive units like Techs and Firewalls get slightly lower weights, but still, their health is factored into the calculation."""
-
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
@@ -591,25 +530,113 @@ class Game:
         """Computer plays a move."""
         mv = self.suggest_move()
         if mv is not None:
-            (success, message, result) = self.perform_move(mv)
+            (success, result, actionType) = self.perform_move(mv)
             if success:
                 print(f"Computer {self.next_player.name}: ",end='')
-                print(result)
+                if result == "":
+                    print(mv.src.to_string() + " " + mv.dst.to_string())
+                else:
+                    print(result)
                 self.next_turn()
                 print("\n" + str(self))
-        return mv
+                move = (mv, actionType)
+                return move
+            else:
+                return (None, actionType)
+        
     
-    """Here, the idea is simple of the heuristic e0 is to count the number of units for each player and take the difference."""
-    """If e0 is positive, it means Player 1 has more units (or if both sides have same number of units, then evaluates which one has better units), and vice versa. """
-    """The purpose of this heuristic is to favor game states where you have more units on the board than your opponent."""
-    """Basically, if one side has more units and/or better units then we return exactly that """
+    def suggest_move(self) -> CoordPair | None:
+        """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
+        start_time = datetime.now()
+        
+        # Variables needed for minimax()
+        alpha_beta = self.options.alpha_beta
+        maxPlayer = True
+        alpha = MIN_HEURISTIC_SCORE
+        beta = MAX_HEURISTIC_SCORE
+        
+        # Start with min depth then half way the game switch to max depth
+        if self.turns_played < self.options.max_turns * 0.5:
+            depth = self.options.min_depth
+        else:
+            depth = self.options.max_depth
+
+        (score, move) = self.minimax(depth, maxPlayer, alpha_beta, alpha, beta)
+        # Start with a random move if there is no best move
+        if score == 0:
+            (_, move, _) = self.random_move()
+
+        # Output
+        
+        elapsed_seconds = (datetime.now() - start_time).total_seconds()
+        self.stats.total_seconds += elapsed_seconds
+        if self.stats.total_seconds > self.options.max_time:
+            trace.write_game_result(winner, game.turns_played)  # Write the game result
+            trace.close()  # Close the trace file
+            print(f"{winner.name} wins!\n{game.turns_played} turns played")
+
+        # print(f"Heuristic score: {score}")
+        # print(f"Average recursive depth: {depth:0.1f}")
+        # print(f"Evals per depth: ",end='')
+        # for k in sorted(self.stats.evaluations_per_depth.keys()):
+        #     print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
+        # print()
+        # total_evals = sum(self.stats.evaluations_per_depth.values())
+        # if self.stats.total_seconds > 0:
+        #     print(f"Eval perf.: {total_evals/self.stats.total_seconds/1000:0.1f}k/s")
+        # print(f"Elapsed time: {elapsed_seconds:0.1f}s")
+        return move
+    
+    def minimax(self, depth, maxPlayer, alpha_beta, alpha, beta) -> Tuple[int, CoordPair]:
+        """ 
+        Search function using minimax and alpha-beta pruning, which takes the search depth, if the current player is the maximizing player, if 
+        alpa-beta pruning is on, alpha's and beta's initial values as inputs. It outputs the best move found by the search and its associated score.
+        """
+        if depth == 0 or self.is_finished(): # Base Case
+            return (self.evaluate(), None)
+        
+        moves = list(self.generate_moves()) # Generate a list of possible moves to search
+        best_move = None
+
+        if maxPlayer: # Maximizing player 
+            best_score = MIN_HEURISTIC_SCORE
+            for move in moves:
+                new_game = self.apply_move(move) # Apply a move to generate a new game state to search
+                if new_game == None:
+                    continue
+                (score, _ ) = new_game.minimax(depth - 1, False, alpha_beta, alpha, beta) # Recursive call to analyze next game state
+                if score > best_score:
+                    best_score = score
+                    best_move = move
+                alpha = max(alpha, score)
+                if alpha_beta and beta <= alpha: # Alpha-Beta pruning
+                    break
+        else: # Minimizing player
+            best_score = MAX_HEURISTIC_SCORE
+            for move in moves:
+                new_game = self.apply_move(move)
+                if new_game == None:
+                    continue
+                (score, _ ) = new_game.minimax(depth - 1, True, alpha_beta, alpha, beta)
+                if score < best_score:
+                    best_score = score
+                    best_move = move
+                beta = min(beta, score)
+                if alpha_beta and beta <= alpha:
+                    break
+        
+        return (best_score, best_move) # Best move chosen after the search and its associated score
 
     def e0(self) -> int:
-        """Calculate the heuristic value e0 based on the provided formula."""
+        """
+        e0 heuristic function: the score is the difference in the number of units for each player. All units except AI are given an arbitrary weight
+        of 3 and AI is given an arbitrary weight of 9999 (since it is the most important unit of the game). A negative result means a disadvantage 
+        for the current player, a null result means the current player has no more no less advantage then the other player.
+        """
         VP1 = TP1 = FP1 = PP1 = AIP1 = 0
         VP2 = TP2 = FP2 = PP2 = AIP2 = 0
 
-        for (coord, unit) in self.player_units(Player.Attacker):
+        for (_, unit) in self.player_units(self.next_player):
             if unit.type == UnitType.Virus:
                 VP1 += 1
             elif unit.type == UnitType.Tech:
@@ -621,7 +648,7 @@ class Game:
             elif unit.type == UnitType.AI:
                 AIP1 += 1
 
-        for (coord, unit) in self.player_units(Player.Defender):
+        for (_, unit) in self.player_units(self.next_player.next()):
             if unit.type == UnitType.Virus:
                 VP2 += 1
             elif unit.type == UnitType.Tech:
@@ -636,88 +663,111 @@ class Game:
         heuristic_value = (3 * (VP1 + TP1 + FP1 + PP1) + 9999 * AIP1) - (3 * (VP2 + TP2 + FP2 + PP2) + 9999 * AIP2)
 
         return heuristic_value
-
     
-    def suggest_move(self) -> CoordPair | None:
-        """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
-        
-        # variables needed for minimax()
-        alpha_beta = self.options.alpha_beta
-        maxPlayer = True
-        alpha = MIN_HEURISTIC_SCORE
-        beta = MAX_HEURISTIC_SCORE
-        
-        # start with min depth then half way the game switch to max depth
-        if self.turns_played < self.options.max_turns * 0.5:
-            depth = self.options.min_depth
-        else:
-            depth = self.options.max_depth
+    """
+    This heuristic emphasizes the protection of the AI while also focusing on attacking the enemy AI. It is a slight refinement of e0.
+    The AI is given a very high weight (10000) to make its survival the top priority. Firewalls are given a slightly higher weight (5) than other units because they absorb attacks well.
+    Viruses have a weight of 2 because they pose a significant threat with their ability to destroy the AI in one attack.
+    """
 
-        #(score, move) = self.minimax(depth, maxPlayer, alpha_beta, alpha, beta)
-        (score, move) = self.minimax(depth, maxPlayer, alpha_beta, alpha, beta)
-        
+    def e1(self):
+        weights = {
+            UnitType.AI: 10000,
+            UnitType.Virus: 3,
+            UnitType.Tech: 1,
+            UnitType.Firewall: 5,
+            UnitType.Program: 1
+        }
 
-        # Output
-        # start_time = datetime.now()
-        # elapsed_seconds = (datetime.now() - start_time).total_seconds()
-        # self.stats.total_seconds += elapsed_seconds
-        # print(f"Heuristic score: {score}")
-        # print(f"Average recursive depth: {depth:0.1f}")
-        # print(f"Evals per depth: ",end='')
-        # for k in sorted(self.stats.evaluations_per_depth.keys()):
-        #     print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
-        # print()
-        # total_evals = sum(self.stats.evaluations_per_depth.values())
-        # if self.stats.total_seconds > 0:
-        #     print(f"Eval perf.: {total_evals/self.stats.total_seconds/1000:0.1f}k/s")
-        # print(f"Elapsed time: {elapsed_seconds:0.1f}s")
-        return move
+        value_p1 = 0  # attacker
+        value_p2 = 0  # defender
+
+        for row in self.board:
+            for cell in row:
+                if cell:
+                    unit_type = cell.type  # get the unit type from the Unit instance
+                    player = cell.player  # get the player from the Unit instance
+
+                    if player == Player.Attacker:
+                        value_p1 += weights[unit_type]
+                    else:
+                        value_p2 += weights[unit_type]
+
+        return value_p1 - value_p2
     
-    def minimax(self, depth, maxPlayer, alpha_beta, alpha, beta) -> Tuple[int, CoordPair]:
-        if depth == 0 or self.is_finished():
-            return (self.evaluate(), None)
-        
-        moves = list(self.generate_moves())
-        #ordered_moves = self.move_ordering(moves)
-        best_move = None
+    """
+    e2 takes the concept further by not just counting the number of units, but by also considering the health of those units.
+    Units with higher health are more likely to survive combat, so the heuristic values states where your units have more health. 
+    The AI's health is given the highest weight due to its importance. Offensive units like Viruses and Programs have slightly higher 
+    weights (3 and 2 respectively) to reflect their attacking capabilities.Defensive units like Techs and Firewalls get slightly lower
+    weights, but still, their health is factored into the calculation.
+    """
 
-        if maxPlayer:
-            best_score = MIN_HEURISTIC_SCORE
-            for move in moves:
-                new_game = self.apply_move(move)
-                if new_game == None:
+    def e2(self, board):
+        weights = {
+            'A': 10000,
+            'V': 3,
+            'T': 1,
+            'P': 2,
+            'F': 1
+        }
+
+        value_p1 = 0  # attacker
+        value_p2 = 0  # defender
+
+        for row in board:
+            for cell in row:
+                if cell:
+                    unit = cell[1]  # 'A', 'V', 'T', 'P', 'F'
+                    player = cell[0]  # 'a' or 'd'
+                    health = int(cell[2])  # 0-9
+
+                    if player == 'a':
+                        value_p1 += weights[unit] * health
+                    else:
+                        value_p2 += weights[unit] * health
+
+        return value_p1 - value_p2
+    
+    def e3(self) -> int:
+        """
+        e3 heuristic function: the score is determined by each unit's (belonging to the current player) advantage over an adjacent unit of the
+        opposing player. It first checks if there is an enemy unit adjacent to the current unit, if so, then their combined difference in health 
+        and in damage makes up for this unit's advantage. The total advantage of all current player's unit is returned. 
+        """
+        score = 0
+        for (src, unit ) in self.player_units(self.next_player): # Go through each unit belonging to the current player
+            for dst in src.iter_adjacent():
+                target = self.get(dst)
+                if target == None:
                     continue
-                (score, _ ) = new_game.minimax(depth - 1, False, alpha_beta, alpha, beta)
-                if score > best_score:
-                    best_score = score
-                    best_move = move
-                alpha = max(alpha, score)
-                if alpha_beta and beta <= alpha:
-                    break
-        else:
-            best_score = MAX_HEURISTIC_SCORE
-            for move in moves:
-                new_game = self.apply_move(move)
-                if new_game == None:
-                    continue
-                (score, _ ) = new_game.minimax(depth - 1, True, alpha_beta, alpha, beta)
-                if score < best_score:
-                    best_score = score
-                    best_move = move
-                beta = min(beta, score)
-                if alpha_beta and beta <= alpha:
-                    break
+                if not self.is_ally(dst):
+                    score += (unit.health - target.health) + (unit.damage_amount(target) - target.damage_amount(unit)) # Compute the current unit's advantage
+        return score # Total advantage of all current player's unit
+    
+    def random_move(self) -> Tuple[int, CoordPair | None, float]:
+        """Returns a random move."""
+        dumb_move = True
+        move_candidates = list(self.generate_moves())
+        while (dumb_move):
+            random.shuffle(move_candidates)
+            if move_candidates[0].src != move_candidates[0].dst:
+                dumb_move = False
         
-        return (best_score, best_move)
+        if len(move_candidates) > 0:
+            return (0, move_candidates[0], 1)
+        else:
+            return (0, None, 0)
     
     def evaluate(self):
-        x = self.e1()
-        # print(x)
+        """Evaluate a game state based on a heuristic function and returns a score associated to it."""
+        x = self.e3()
         return x
 
     def generate_moves(self) -> Iterable[CoordPair]:
+        """Generate all valid possible moves based on the calling game state."""
         move = CoordPair()
-        for (src, _ ) in self.player_units(self.next_player):
+        for (src, unit ) in self.player_units(self.next_player):
             move.src = src
             # Moving to an adjacent empty cell
             for dst in src.iter_adjacent():
@@ -726,7 +776,7 @@ class Game:
                     yield move.clone()
             # Self destruct action
             move.dst = src
-            if self.is_valid_action(move) and not self.is_empty(move.dst) :
+            if self.is_valid_action(move) and not self.is_empty(move.dst) and unit.type != UnitType.AI: # AI self destruct is not considered a valid move
                 yield move.clone()
 
             # Repair and attack actions
@@ -735,15 +785,16 @@ class Game:
                 if self.is_valid_action(move) and not self.is_empty(move.dst):
                     yield move.clone()
 
-    # def move_ordering(self, moves, player):
-    #     pass
-
     def apply_move(self, move: CoordPair) -> Game:
+        """
+        This function applies a input move on the calling game state to simulate a new game state. It calls perform_move to apply the move 
+        and returns a new game state resulting in the application of the move.
+        """
         new_game = self.clone()
-        (success, _ , _ ) = new_game.perform_move(move)
+        (success, _ , _ ) = new_game.perform_move(move) # Perform given move on calling game state
 
         if success:
-            return new_game
+            return new_game # Return new game state
         else:
             return None
 
@@ -780,6 +831,14 @@ class GameTrace:
         self.file.write(f"Max Turns: {options.max_turns}\n")
         self.file.write(f"Alpha-Beta: {'On' if options.alpha_beta else 'Off'}\n")
         self.file.write(f"Play Mode: {options.game_type}\n")
+        if options.game_type == "manual":
+            self.file.write("Attacker: H & Defender: H\n")
+        elif options.game_type == "auto":
+            self.file.write("Attacker: AI & Defender: AI\n")
+        elif options.game_type == "defender":
+            self.file.write("Attacker: AI & Defender: H\n")
+        else:
+            self.file.write("Attacker: H & Defender: AI\n")
         self.file.flush()  # Flush the buffer
 
     def write_board(self, game):
@@ -820,7 +879,7 @@ def main():
     parser.add_argument('--max_time', type=float, help='maximum search time')
     parser.add_argument('--max_turns', type=int, help='maximum turns before end of game', default=100)
     parser.add_argument('--alpha_beta', type=bool, help='alpha-beta on/off', default=False)
-    parser.add_argument('--game_type', type=str, choices=["auto", "attacker", "defender", "manual"], default="defender",
+    parser.add_argument('--game_type', type=str, choices=["auto", "attacker", "defender", "manual"], default="manual",
                         help='game type: auto|attacker|defender|manual')
     args = parser.parse_args()
 
