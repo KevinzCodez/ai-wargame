@@ -11,10 +11,6 @@ from typing import Tuple, Iterable, ClassVar
 MAX_HEURISTIC_SCORE = 2000000000
 MIN_HEURISTIC_SCORE = -2000000000
 
-# maximum and minimum values for our heuristic scores (usually represents an end of game condition)
-MAX_HEURISTIC_SCORE = 2000000000
-MIN_HEURISTIC_SCORE = -2000000000
-
 class UnitType(Enum):
     """Every unit type."""
     AI = 0
@@ -42,6 +38,18 @@ class GameType(Enum):
     AttackerVsComp = 1
     CompVsDefender = 2
     CompVsComp = 3
+
+    def __str__(self):
+        if self == GameType.AttackerVsDefender:
+            return "Attacker vs Defender"
+        elif self == GameType.AttackerVsComp:
+            return "Attacker vs Comp"
+        elif self == GameType.CompVsDefender:
+            return "Comp vs Defender"
+        elif self == GameType.CompVsComp:
+            return "Comp vs Comp"
+        else:
+            return super().__str__()
 
 
 ##############################################################################################################
@@ -227,6 +235,7 @@ class Options:
     game_type: GameType = GameType.AttackerVsDefender
     alpha_beta: bool = True
     max_turns: int | None = 100
+    heuristic: int | None = 0
 
 ##############################################################################################################
 
@@ -248,6 +257,7 @@ class Game:
     stats: Stats = field(default_factory=Stats)
     _attacker_has_ai: bool = True
     _defender_has_ai: bool = True
+    h_score: int = -2000000000
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
@@ -378,7 +388,7 @@ class Game:
         if self.is_empty(coords.dst) and self.is_valid_move(coords, False):
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
-                return (True,"",0)
+                return (True,"", 0)
                     
         elif not self.is_empty(coords.dst) and self.is_valid_action(coords):
             (success, message, actionType) = self.action(coords)
@@ -534,7 +544,7 @@ class Game:
             if success:
                 print(f"Computer {self.next_player.name}: ",end='')
                 if result == "":
-                    print(mv.src.to_string() + " " + mv.dst.to_string())
+                    print(f"move from {mv.src.to_string()} to {mv.dst.to_string()}")
                 else:
                     print(result)
                 self.next_turn()
@@ -562,18 +572,12 @@ class Game:
             depth = self.options.max_depth
 
         (score, move) = self.minimax(depth, maxPlayer, alpha_beta, alpha, beta)
-        # Start with a random move if there is no best move
-        if score == 0:
-            (_, move, _) = self.random_move()
+        self.h_score = score
 
         # Output
         
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
-        if self.stats.total_seconds > self.options.max_time:
-            trace.write_game_result(winner, game.turns_played)  # Write the game result
-            trace.close()  # Close the trace file
-            print(f"{winner.name} wins!\n{game.turns_played} turns played")
 
         # print(f"Heuristic score: {score}")
         # print(f"Average recursive depth: {depth:0.1f}")
@@ -695,43 +699,9 @@ class Game:
 
         return value_p1 - value_p2
     
-    """
-    e2 takes the concept further by not just counting the number of units, but by also considering the health of those units.
-    Units with higher health are more likely to survive combat, so the heuristic values states where your units have more health. 
-    The AI's health is given the highest weight due to its importance. Offensive units like Viruses and Programs have slightly higher 
-    weights (3 and 2 respectively) to reflect their attacking capabilities.Defensive units like Techs and Firewalls get slightly lower
-    weights, but still, their health is factored into the calculation.
-    """
-
-    def e2(self, board):
-        weights = {
-            'A': 10000,
-            'V': 3,
-            'T': 1,
-            'P': 2,
-            'F': 1
-        }
-
-        value_p1 = 0  # attacker
-        value_p2 = 0  # defender
-
-        for row in board:
-            for cell in row:
-                if cell:
-                    unit = cell[1]  # 'A', 'V', 'T', 'P', 'F'
-                    player = cell[0]  # 'a' or 'd'
-                    health = int(cell[2])  # 0-9
-
-                    if player == 'a':
-                        value_p1 += weights[unit] * health
-                    else:
-                        value_p2 += weights[unit] * health
-
-        return value_p1 - value_p2
-    
-    def e3(self) -> int:
+    def e2(self) -> int:
         """
-        e3 heuristic function: the score is determined by each unit's (belonging to the current player) advantage over an adjacent unit of the
+        e2 heuristic function: the score is determined by each unit's (belonging to the current player) advantage over an adjacent unit of the
         opposing player. It first checks if there is an enemy unit adjacent to the current unit, if so, then their combined difference in health 
         and in damage makes up for this unit's advantage. The total advantage of all current player's unit is returned. 
         """
@@ -761,8 +731,13 @@ class Game:
     
     def evaluate(self):
         """Evaluate a game state based on a heuristic function and returns a score associated to it."""
-        x = self.e3()
-        return x
+        if self.options.heuristic == 0:
+            e = self.e0()
+        elif self. options.heuristic == 1:
+            e = self.e1
+        else:
+            e = self.e2
+        return e
 
     def generate_moves(self) -> Iterable[CoordPair]:
         """Generate all valid possible moves based on the calling game state."""
@@ -830,7 +805,7 @@ class GameTrace:
         self.file.write(f"Timeout: {options.max_time} seconds\n")
         self.file.write(f"Max Turns: {options.max_turns}\n")
         self.file.write(f"Alpha-Beta: {'On' if options.alpha_beta else 'Off'}\n")
-        self.file.write(f"Play Mode: {options.game_type}\n")
+        self.file.write(f"Play Mode: {str(options.game_type)}\n")
         if options.game_type == "manual":
             self.file.write("Attacker: H & Defender: H\n")
         elif options.game_type == "auto":
@@ -839,13 +814,14 @@ class GameTrace:
             self.file.write("Attacker: AI & Defender: H\n")
         else:
             self.file.write("Attacker: H & Defender: AI\n")
+        self.file.write(f"Heuristic used by AI: e{options.heuristic}\n")
         self.file.flush()  # Flush the buffer
 
     def write_board(self, game):
         self.file.write(str(game) + "\n")
         self.file.flush()  # Flush the buffer
 
-    def write_action(self, turn, player, action):
+    def write_action(self, game, turn, player, action, time):
         self.file.write(f"Turn #{turn} - {player.next().name}\n")
         (coords, actionType) = action
         string = ""
@@ -860,6 +836,9 @@ class GameTrace:
                 string = "attack"
 
         self.file.write(f"Action: {string} from {coords.src} to {coords.dst}\n")
+        if time != None:
+            self.file.write(f"time for this action: {time} sec\n")
+            self.file.write(f"heuristic score: {game.h_score}\n")
         self.file.flush()  # Flush the buffer
 
     def write_game_result(self, winner, turns_played):
@@ -876,7 +855,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog='ai_wargame',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--max_time', type=float, help='maximum search time')
+    parser.add_argument('--max_time', type=float, help='maximum search time', default=5)
     parser.add_argument('--max_turns', type=int, help='maximum turns before end of game', default=100)
     parser.add_argument('--alpha_beta', type=bool, help='alpha-beta on/off', default=False)
     parser.add_argument('--game_type', type=str, choices=["auto", "attacker", "defender", "manual"], default="manual",
@@ -887,7 +866,7 @@ def main():
     # Initialize the GameTrace
     filename = f"gameTrace-{'true' if args.alpha_beta else 'false'}-{args.max_time}-{args.max_turns}.txt"
     trace = GameTrace(filename)
-    trace.write_parameters(args)
+    # trace.write_parameters(args)
 
     # parse the game type
     if args.game_type == "attacker":
@@ -904,6 +883,7 @@ def main():
     options.max_time = args.max_time
     options.max_turns = args.max_turns
     options.alpha_beta = args.alpha_beta
+    trace.write_parameters(options)
 
     # override class defaults via command line options
     if args.max_time is not None:
@@ -916,6 +896,7 @@ def main():
     # create a new game
     game = Game(options=options)
     end = False
+    stats = Stats()
 
     print()
     print(game)
@@ -925,14 +906,13 @@ def main():
         end = game.is_finished()
         winner = game.has_winner()
         if winner is not None:
-            trace.write_board(game)  # Write the current board state
             trace.write_game_result(winner, game.turns_played)  # Write the game result
             trace.close()  # Close the trace file
             print(f"{winner.name} wins!\n{game.turns_played} turns played")
             break
         if game.options.game_type == GameType.AttackerVsDefender:
             move = game.human_turn()
-            trace.write_action(game.turns_played, game.next_player, move)  # Log the action to the trace file
+            trace.write_action(game, game.turns_played, game.next_player, move, None)  # Log the action to the trace file
             trace.write_board(game)  # Write the current board state to the trace
         elif game.options.game_type == GameType.AttackerVsComp and game.next_player == Player.Attacker:
             game.human_turn()
@@ -941,6 +921,14 @@ def main():
         else:
             player = game.next_player
             move = game.computer_turn()
+            trace.write_action(game, game.turns_played, game.next_player, move, stats.total_seconds)
+            trace.write_board(game)
+            if stats.total_seconds > options.max_time:
+                trace.write_board(game)  # Write the current board state
+                trace.write_game_result(game.next_player.next(), game.turns_played)  # Write the game result
+                trace.close()  # Close the trace file
+                print(f"{game.next_player.name} took too long! Winner is {game.next_player.next().name}")
+                break
             if move is not None:
                 continue
             else:
