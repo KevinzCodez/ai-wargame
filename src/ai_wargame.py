@@ -258,6 +258,7 @@ class Game:
     _attacker_has_ai: bool = True
     _defender_has_ai: bool = True
     h_score: int = -2000000000
+    states_evaluated: int = 0
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
@@ -571,24 +572,21 @@ class Game:
         else:
             depth = self.options.max_depth
 
+        for i in range(depth):
+            self.stats.evaluations_per_depth[i + 1] = 0
+
         (score, move) = self.minimax(depth, maxPlayer, alpha_beta, alpha, beta)
         self.h_score = score
-
-        # Output
         
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
-        self.stats.total_seconds += elapsed_seconds
+        self.stats.total_seconds = elapsed_seconds
+        print(self.stats.total_seconds)
 
-        # print(f"Heuristic score: {score}")
-        # print(f"Average recursive depth: {depth:0.1f}")
-        # print(f"Evals per depth: ",end='')
-        # for k in sorted(self.stats.evaluations_per_depth.keys()):
-        #     print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
-        # print()
-        # total_evals = sum(self.stats.evaluations_per_depth.values())
-        # if self.stats.total_seconds > 0:
-        #     print(f"Eval perf.: {total_evals/self.stats.total_seconds/1000:0.1f}k/s")
-        # print(f"Elapsed time: {elapsed_seconds:0.1f}s")
+        print(f"Evals per depth: ",end='')
+        for k in sorted(self.stats.evaluations_per_depth.keys()):
+            print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
+        print()
+        self.states_evaluated = sum(self.stats.evaluations_per_depth.values())
         return move
     
     def minimax(self, depth, maxPlayer, alpha_beta, alpha, beta) -> Tuple[int, CoordPair]:
@@ -597,6 +595,7 @@ class Game:
         alpa-beta pruning is on, alpha's and beta's initial values as inputs. It outputs the best move found by the search and its associated score.
         """
         if depth == 0 or self.is_finished(): # Base Case
+            self.stats.evaluations_per_depth[depth] = self.stats.evaluations_per_depth.get(depth, 0) + 1
             return (self.evaluate(), None)
         
         moves = list(self.generate_moves()) # Generate a list of possible moves to search
@@ -839,6 +838,7 @@ class GameTrace:
         if time != None:
             self.file.write(f"time for this action: {time} sec\n")
             self.file.write(f"heuristic score: {game.h_score}\n")
+            self.file.write(f"Cumulative evals: {game.states_evaluated}\n")
         self.file.flush()  # Flush the buffer
 
     def write_game_result(self, winner, turns_played):
@@ -858,7 +858,7 @@ def main():
     parser.add_argument('--max_time', type=float, help='maximum search time', default=5)
     parser.add_argument('--max_turns', type=int, help='maximum turns before end of game', default=100)
     parser.add_argument('--alpha_beta', type=bool, help='alpha-beta on/off', default=False)
-    parser.add_argument('--game_type', type=str, choices=["auto", "attacker", "defender", "manual"], default="manual",
+    parser.add_argument('--game_type', type=str, choices=["auto", "attacker", "defender", "manual"], default="auto",
                         help='game type: auto|attacker|defender|manual')
     args = parser.parse_args()
 
@@ -921,7 +921,7 @@ def main():
         else:
             player = game.next_player
             move = game.computer_turn()
-            trace.write_action(game, game.turns_played, game.next_player, move, stats.total_seconds)
+            trace.write_action(game, game.turns_played, game.next_player, move, game.stats.total_seconds)
             trace.write_board(game)
             if stats.total_seconds > options.max_time:
                 trace.write_board(game)  # Write the current board state
