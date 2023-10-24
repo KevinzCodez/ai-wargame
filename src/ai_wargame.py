@@ -566,11 +566,7 @@ class Game:
         alpha = MIN_HEURISTIC_SCORE
         beta = MAX_HEURISTIC_SCORE
         
-        # Start with min depth then half way the game switch to max depth
-        if self.turns_played < self.options.max_turns * 0.5:
-            depth = self.options.min_depth
-        else:
-            depth = self.options.max_depth
+        depth = self.depth()
 
         for i in range(depth):
             self.stats.evaluations_per_depth[i + 1] = 0
@@ -580,14 +576,22 @@ class Game:
         
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds = elapsed_seconds
-        print(self.stats.total_seconds)
 
         print(f"Evals per depth: ",end='')
         for k in sorted(self.stats.evaluations_per_depth.keys()):
-            print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
+            print(f"{depth}={self.stats.evaluations_per_depth[k]} ",end='')
+            depth -= 1
         print()
         self.states_evaluated = sum(self.stats.evaluations_per_depth.values())
         return move
+    
+    def depth(self):
+        depth = 0
+        if self.turns_played < self.options.max_turns * 0.5:
+            depth = self.options.min_depth
+        else:
+            depth = self.options.max_depth
+        return depth
     
     def minimax(self, depth, maxPlayer, alpha_beta, alpha, beta) -> Tuple[int, CoordPair]:
         """ 
@@ -599,6 +603,7 @@ class Game:
             return (self.evaluate(), None)
         
         moves = list(self.generate_moves()) # Generate a list of possible moves to search
+        self.stats.evaluations_per_depth[depth] += len(moves)
         best_move = None
 
         if maxPlayer: # Maximizing player 
@@ -836,9 +841,24 @@ class GameTrace:
 
         self.file.write(f"Action: {string} from {coords.src} to {coords.dst}\n")
         if time != None:
-            self.file.write(f"time for this action: {time} sec\n")
-            self.file.write(f"heuristic score: {game.h_score}\n")
+            self.file.write(f"Time for this action: {time} sec\n")
+            self.file.write(f"Heuristic score: {game.h_score}\n")
             self.file.write(f"Cumulative evals: {game.states_evaluated}\n")
+            depth = game.depth()
+            self.file.write(f"Cumulative evals by depth: ")
+            for k in sorted(game.stats.evaluations_per_depth.keys()):
+                self.file.write(f"{depth}={game.stats.evaluations_per_depth[k]} ")
+                depth -= 1
+            self.file.write("\n")
+            depth = game.depth()
+            self.file.write(f"Cumulative % evals by depth: ")
+            for k in sorted(game.stats.evaluations_per_depth.keys()):
+                percentage = (game.stats.evaluations_per_depth[k] / game.states_evaluated) * 100
+                self.file.write(f"{depth}={percentage:.1f}% ")
+                depth -= 1
+            self.file.write("\n")
+
+        self.file.write("\n")
         self.file.flush()  # Flush the buffer
 
     def write_game_result(self, winner, turns_played):
